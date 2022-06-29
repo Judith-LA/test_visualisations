@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<script type = "text/javascript" src="https://d3js.org/d3.v7.min.js"></script>
+		<script type="text/javascript" src="../legend.js"></script>
+		<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200&family=Source+Sans+Pro:wght@300&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="style.css"></link>
+		<title>Indirect Bias Exploration - Visualisation 2</title>
+	</head>
+	<body>
+		<h1> Indirect Bias Exploration - Visualisation 2</h1>
+
+		<div>
+			<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
+			<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
+			<div id='divColorScale' style='text-align: center; width:50%; float: right;'></div>
+		</div>
+		<div>
+			<div id='scatterDetails' style='text-align: center; width:50%; float: right;'>
+				<div id='slider' class='slider'></div>
+			</div>
+			<div style='text-align: center; width:50%; float: left;'>
+				<div id='divScatterPlot' style='text-align: center; width: 95%;'></div>
+			</div>
+		</div>
+
+		<script type="text/javascript">
+			var models = ['bert-base', 'bert-large', 'xl-base', 'xl-large'];
+			//var models = ['bert-base'];
+			var  dimReductions = [{'name': 't-SNE', 'value': 'tsne'},
+								  {'name': 'UMAP', 'value': 'umap'},
+								  {'name': 'ISOMAP', 'value': 'isomap'}]
+			var target_attributes = ['beverage', 'country', 'occupation', 'sport'];
+			var sensitive_attributes = ['age', 'gender', 'race', 'religion', 'sexual_orientation', 'yob'];
+
+			var targetOptions = [{'name': 'Beverage', 'value': 'beverage'}, 
+								 {'name': 'Country', 'value': 'country'}, 
+								 {'name': 'Occupation', 'value': 'occupation'},
+								 {'name': 'Sport', 'value': 'sport'}]
+			var featureOptions = [{'name': 'Beverage', 'value': 'beverage'},
+							  	  {'name': 'Country', 'value': 'country'}, 
+							  	  {'name': 'Occupation', 'value': 'occupation'},
+							  	  {'name': 'Sport', 'value': 'sport'},
+							  	  {'name': 'Mental and Physical Traits', 'value': 'trait'}]
+			var sensitiveOptions = [{'name': 'Age', 'value': 'age'},
+									{'name': 'Gender', 'value': 'gender'},
+									{'name': 'Race', 'value': 'race'},
+									{'name': 'Religion', 'value': 'religion'},
+									{'name': 'Sexual Orientation', 'value': 'sexual_orientation'},
+									{'name': 'Year of Birth', 'value': 'yob'}]
+
+			
+			var colorScaleMin = -1, colorScaleMax = 1;
+			var colorScale = d3.scaleSequential()
+								.domain([colorScaleMin,colorScaleMax])
+								.interpolator(d3.interpolatePuOr);
+			var colorScaleLegend = {0: 'no correlation'};
+			//colorScaleLegend[colorScaleMin] = 'strong negative - correlation', colorScaleLegend[colorScaleMax] = 'strong positive - correlation';
+			colorScaleLegend[colorScaleMin] = 'strongly negative', colorScaleLegend[colorScaleMax] = 'strongly positive';
+
+			var selectedModel, selectedDimReduction;
+			var selectedTarget, selectedFeature, selectedColorScaleFeature, selectedColorScale;
+
+			var delay = 200;
+
+			function loadFilesInit(){
+				target_attributes.forEach(function(t1){
+					target_attributes.forEach(function(t2){
+						if (t1 != t2){
+							this[t1 + '_' + t2 + '_corr'] = {};
+							this[t1 + '_' + t2 + '_indirect'] = {};
+							this[t1 + '_' + t2 + '_scatter'] = {};
+							var d_corr = eval(t1 + '_' + t2 + '_corr');
+							var d_indirect = eval(t1 + '_' + t2 + '_indirect');
+							var d_scatter = eval(t1 + '_' + t2 + '_scatter');
+							models.forEach(function(m){;
+								d_corr[m] = null;
+								d_indirect[m] = null;
+								d_scatter[m] = null;
+							});
+						}
+					});
+
+					this[t1 + '_trait' + '_corr'] = {};
+					this[t1 + '_trait' + '_indirect'] = {};
+					this[t1 + '_trait' + '_scatter'] = {};
+					var d_corr = eval(t1 + '_trait' + '_corr');
+					var d_indirect = eval(t1 + '_trait'+ '_indirect');
+					var d_scatter = eval(t1 + '_trait' + '_scatter');
+					models.forEach(function(m){;
+						d_corr[m] = null;
+						d_indirect[m] = null;
+						d_scatter[m] = null;
+					});
+
+					sensitive_attributes.forEach(function(s){
+						this[t1 + '_' + s + '_corr'] = {};
+						this[t1 + '_' + s + '_indirect'] = {};
+						this[t1 + '_' + s + '_scatter'] = {};
+						var d_corr = eval(t1 + '_' + s + '_corr');
+						var d_indirect = eval(t1 + '_' + s + '_indirect');
+						var d_scatter = eval(t1 + '_' + s + '_scatter');
+						models.forEach(function(m){
+							d_corr[m] = null;
+							d_indirect[m] = null;
+							d_scatter[m] = null;
+						});
+					});
+				});
+			};
+
+			function loadFiles(){
+				models.forEach(function(m){
+					target_attributes.forEach(function(t1){
+						target_attributes.forEach(function(t2){
+							if (t1 != t2){
+								var d_corr = eval(t1 + '_' + t2 + '_corr');
+								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_correlation.csv").then(function(data){
+									d_corr[m] = data;
+								});
+								var d_indirect = eval(t1 + '_' + t2 + '_indirect');
+								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_indirect.csv").then(function(data){
+									d_indirect[m] = data;
+								});
+								var d_scatter = eval(t1 + '_' + t2 + '_scatter');
+								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_scatter.csv").then(function(data){
+									d_scatter[m] = data;
+								});
+							}
+						});
+
+						var d_corr = eval(t1 + '_trait' + '_corr');
+						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_correlation.csv").then(function(data){
+							d_corr[m] = data;
+						});
+						var d_indirect = eval(t1 + '_trait'+ '_indirect');
+						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_indirect.csv").then(function(data){
+							d_indirect[m] = data;
+						});
+						var d_scatter = eval(t1 + '_trait'+ '_scatter');
+						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_scatter.csv").then(function(data){
+							d_scatter[m] = data;
+						});
+
+						sensitive_attributes.forEach(function(s){
+							var d_corr = eval(t1 + '_' + s + '_corr');
+							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_correlation.csv").then(function(data){
+								d_corr[m] = data;
+							});
+							var d_indirect = eval(t1 + '_' + s + '_indirect');
+							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_indirect.csv").then(function(data){
+								d_indirect[m] = data;
+							});
+							var d_scatter = eval(t1 + '_' + s + '_scatter');
+							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_scatter.csv").then(function(data){
+								d_scatter[m] = data;
+							});
+						});
+					});
+
+				});
+			};
+
+
+			function setUpVisualisation(){
+				d3.select('#divModel').text('Choose the model and dimensionality reduction to use');
+				d3.select('#divModel').append('br');
+
+				var modelSelect = d3.select('#divModel')
+									.append('select')
+									.attr('id', 'modelSelect')
+									.attr('name', 'modelSelect');
+				modelSelect.append('option')
+						   .text('-')
+						   .attr('value', ' ')
+						   .attr('id', 'nullModel');
+				modelSelect.selectAll('modelOptions')
+						   .data(models)
+						   .enter()
+						   .append('option')
+						   .text(function (d) { return d; })
+						   .attr('value', function (d) { return d; })
+						   .attr('id', function (d) { return d; });
+				modelSelect.on('change', selectModel);
+
+				var dimReductionSelect = d3.select('#divModel')
+										   .append('select')
+										   .attr('id', 'dimReductionSelect')
+										   .attr('name', 'dimReductionSelect');
+				dimReductionSelect.append('option')
+						   		  .text('-')
+						   		  .attr('value', ' ')
+						   		  .attr('id', 'nullDimReduction');
+				dimReductionSelect.selectAll('modelOptions')
+								  .data(dimReductions)
+								  .enter()
+								  .append('option')
+								  .text(function (d) { return d.name; })
+								  .attr('value', function (d) { return d.value; })
+								  .attr('id', function (d) { return d.value; });
+				dimReductionSelect.on('change', selectDimReduction);
+
+
+				d3.select('#divSelection').text('Choose the attributes to compare');
+				d3.select('#divSelection').append('br');
+
+				var targetSelect = d3.select('#divSelection')
+									 .append('select')
+									 .attr('id', 'targetAttr')
+									 .attr('name', 'targetAttr');
+				targetSelect.append('option')
+							.text('-')
+							.attr('value', ' ')
+							.attr('id', 'nullTarget');
+				targetSelect.selectAll('targetOptions')
+							.data(targetOptions)
+							.enter()
+							.append('option')
+							.text(function (d) { return d.name; })
+							.attr('value', function (d) { return d.value; })
+							.attr('id', function (d) { return d.value+'Target'; });
+				targetSelect.on('change', selectTarget);
+				targetSelect.on('mouseover', function(){ 
+												d3.select('#targetSelectLabel').attr('hidden', null); 
+												d3.select('#nullLabel').attr('hidden', true); 
+											});
+				targetSelect.on('mouseout', function(){ 
+												d3.select('#targetSelectLabel').attr('hidden', true); 
+												d3.select('#nullLabel').attr('hidden', null); 
+											});
+
+				var featureSelect = d3.select('#divSelection')
+								  	  .append('select')
+								  	  .attr('id', 'featureAttr')
+									  .attr('name', 'featureAttr');
+				featureSelect.append('option')
+							 .text('-')
+							 .attr('value', ' ')
+							 .attr('id', 'nullFeature');
+				featureSelect.selectAll('featureOptions')
+							 .data(featureOptions)
+							 .enter()
+							 .append('option')
+							 .text(function (d) { return d.name; })
+							 .attr('value', function (d) { return d.value; })
+							 .attr('id', function (d) { return d.value+'Feature'; });
+				featureSelect.on('change', selectFeature);
+				featureSelect.on('mouseover', function(){ 
+												d3.select('#featureSelectLabel').attr('hidden', null); 
+												d3.select('#nullLabel').attr('hidden', true); 
+											});
+				featureSelect.on('mouseout', function(){ 
+												d3.select('#featureSelectLabel').attr('hidden', true); 
+												d3.select('#nullLabel').attr('hidden', null); 
+											});
+
+				var sensitiveAttrSelect = d3.select('#divSelection')
+											.append('select')
+											.attr('id', 'sensitiveAttr')
+											.attr('name', 'sensitiveAttr');
+				sensitiveAttrSelect.append('option')
+								   .text('-')
+								   .attr('value', ' ')
+								   .attr('id', 'nullSensitiveAttr');
+				sensitiveAttrSelect.selectAll('sensitiveAttr')
+								   .data(sensitiveOptions)
+								   .enter()
+								   .append('option')
+								   .text(function (d) { return d.name; })
+								   .attr('value', function (d) { return d.value; })
+								   .attr('id', function (d) { return d.value+'SensitiveAttr'; });
+				sensitiveAttrSelect.on('change', selectSensitiveAttr);
+				sensitiveAttrSelect.on('mouseover', function(){ 
+													d3.select('#sensitiveSelectLabel').attr('hidden', null); 
+													d3.select('#nullLabel').attr('hidden', true); 
+												});
+				sensitiveAttrSelect.on('mouseout', function(){ 
+													d3.select('#sensitiveSelectLabel').attr('hidden', true); 
+													d3.select('#nullLabel').attr('hidden', null); 
+												});
+
+				d3.select('#divSelection').append('br');
+
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'nullLabel')
+				  .style('color', '#E8E8E8')
+				  .text('---')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'targetSelectLabel')
+				  .attr('for', 'targetAttr')
+				  .attr('hidden', true)
+				  .text('Target attribute (elements shown)')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'featureSelectLabel')
+				  .attr('for', 'featureAttr')
+				  .attr('hidden', true)
+				  .text('Feature attribute (defining high-dimensional space)')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+	   			  .append('Label')
+	   			  .attr('id', 'sensitiveSelectLabel')
+	   			  .attr('for', 'sensitiveAttr')
+	   			  .attr('hidden', true)
+	   			  .text('Sensitive attribute (defining high-dimensional space)')
+				  .style('font-size', '80%');
+
+				d3.select('#divSelection').attr('hidden', true);
+
+
+				d3.select('#divColorScale').text('Choose the feature to scale the colors');
+				d3.select('#divColorScale').append('br');
+
+				var colorScaleFeatureSelect = d3.select('#divColorScale')
+										 		.append('select')
+										 		.attr('id', 'colorScaleFeature')
+									 	 		.attr('name', 'colorScaleFeature');
+
+				var colorScaleSelect = d3.select('#divColorScale')
+										 .append('select')
+										 .attr('id', 'colorScale')
+									 	 .attr('name', 'colorScale');
+
+				d3.select('#divColorScale').attr('hidden', true);
+			};
+
+			function selectModel(){
+				var modelSelect = d3.select('#modelSelect').node();
+				selectedModel = modelSelect.options[modelSelect.selectedIndex].value;
+
+				d3.select('#nullModel').attr('disabled', true);
+				if (selectedDimReduction){ d3.select('#divSelection').attr('hidden', null); }
+
+				if (selectedTarget && selectedFeature){
+					var clickedCircle = d3.selectAll('circle').filter('.clicked');
+					if (!clickedCircle.empty()){ var clickedCircleId = clickedCircle.attr('id'); };
+
+					createIndirectScatterPlot(selectedTarget, selectedFeature);
+					selectColorScale();
+					if (clickedCircleId){ 
+   						d3.select('#'+clickedCircleId).classed('clicked', true);
+   						d3.select('#'+clickedCircleId).style('fill', 'red');
+   						d3.select('#'+clickedCircleId).attr('stroke', 'black');
+   						showDetails(clickedCircleId);
+					};
+				}
+			};
+
+			function selectDimReduction(){
+				var dimReductionSelect = d3.select('#dimReductionSelect').node();
+				selectedDimReduction = dimReductionSelect.options[dimReductionSelect.selectedIndex].value;
+
+				d3.select('#nullDimReduction').attr('disabled', true);
+				if (selectedModel){ d3.select('#divSelection').attr('hidden', null); }
+
+				if (selectedTarget && selectedFeature){
+					var clickedCircle = d3.selectAll('circle').filter('.clicked');
+					if (!clickedCircle.empty()){ var clickedCircleId = clickedCircle.attr('id'); };
+
+					createIndirectScatterPlot(selectedTarget, selectedFeature);
+					selectColorScale();
+					if (clickedCircleId){ 
+   						d3.select('#'+clickedCircleId).classed('clicked', true);
+   						d3.select('#'+clickedCircleId).style('fill', 'red');
+   						d3.select('#'+clickedCircleId).attr('stroke', 'black');
+   						showDetails(clickedCircleId);
+					};
+				}
+			};
+
+			function selectTarget(){
+				d3.select('#divScatterPlot').selectAll('*').remove();
+				d3.select('#slider').selectAll('*').remove();
+
+				var targetSelect = d3.select('#targetAttr').node();
+				var featureSelect = d3.select('#featureAttr');
+				var sensitiveAttrSelect = d3.select('#sensitiveAttr');
+				selectedTarget = targetSelect.options[targetSelect.selectedIndex].value;
+				
+				d3.select('#nullTarget').attr('disabled', true);
+				featureSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullFeature').attr('disabled', true);
+				d3.select('#' + selectedTarget + 'Feature').attr('disabled', true);
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				if (selectedFeature) { 
+					createIndirectScatterPlot(selectedTarget, selectedFeature);
+				
+					if (selectedColorScale){
+						selectColorScale();
+					}
+				};
+			};
+
+			function selectFeature(){
+				d3.select('#divScatterPlot').selectAll('*').remove();
+				d3.select('#slider').selectAll('*').remove();
+				
+				var targetSelect = d3.select('#targetAttr');
+				var featureSelect = d3.select('#featureAttr').node();
+				var sensitiveAttrSelect = d3.select('#sensitiveAttr');
+				var colorScaleFeatureSelect = d3.select('#colorScaleFeature');
+				var colorScaleSelect = d3.select('#colorScale');
+				selectedFeature = featureSelect.options[featureSelect.selectedIndex].value;
+
+				targetSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullTarget').attr('disabled', true);
+				d3.select('#nullFeature').attr('disabled', true);
+				d3.select('#' + selectedFeature + 'Target').attr('disabled', true);
+				sensitiveAttrSelect.selectAll('option').attr('disabled', null);
+				sensitiveAttrSelect.node().selectedIndex = 0;
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				if (selectedTarget) {
+					createIndirectScatterPlot(selectedTarget, selectedFeature);
+					
+					var previousSelectedColorScaleFeature, previousSelectedColorScaleIndex;
+					if (selectedColorScaleFeature && 
+						sensitiveOptions.map(x => x.value).includes(selectedColorScaleFeature)){
+						previousSelectedColorScaleFeature = selectedColorScaleFeature;
+						previousSelectedColorScaleIndex = Array.from(colorScaleSelect.node().options
+																	).map(x => x.id).indexOf(selectedColorScale+'ColorScale');
+					}
+
+					colorScaleFeatureSelect.selectAll('option').remove();
+					colorScaleSelect.selectAll('option').remove();
+					selectedColorFeatureScale = null, selectedColorScale = null;
+
+					d3.select('#divColorScale').attr('hidden', null);
+					colorScaleFeatureSelect.append('option')
+											.text('-')
+								    		.attr('value', ' ')
+											.attr('id', 'nullColorScale');
+					var colorScaleFeatureOptions = [featureOptions[featureSelect.selectedIndex - 1]].concat(sensitiveOptions);
+					colorScaleFeatureSelect.selectAll('colorScaleFeatureOptions')
+							 			   .data(colorScaleFeatureOptions)
+							 			   .enter().append('option')
+							 			   .text(function (d) { return d.name; })
+							 			   .attr('value', function (d) { return d.value; })
+							 			   .attr('id', function (d) { return d.value+'ColorScaleFeature'; });
+					colorScaleFeatureSelect.on('change', selectColorScaleFeature);
+
+					if (previousSelectedColorScaleFeature){
+						colorScaleFeatureSelect.node().selectedIndex = Array.from(colorScaleFeatureSelect.node().options
+																		).map(x => x.id).indexOf(previousSelectedColorScaleFeature+'ColorScaleFeature');
+						selectColorScaleFeature();
+						colorScaleSelect.node().selectedIndex = previousSelectedColorScaleIndex;
+						selectColorScale();
+					}
+				};
+			};
+
+			function selectSensitiveAttr(){
+				d3.select('#divScatterPlot').selectAll('*').remove();
+				d3.select('#slider').selectAll('*').remove(); 
+				
+				var targetSelect = d3.select('#targetAttr');
+				var featureSelect = d3.select('#featureAttr');
+				var sensitiveAttrSelect = d3.select('#sensitiveAttr').node();
+				var colorScaleFeatureSelect = d3.select('#colorScaleFeature');
+				var colorScaleSelect = d3.select('#colorScale');
+				selectedFeature = sensitiveAttrSelect.options[sensitiveAttrSelect.selectedIndex].value;
+
+				targetSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullTarget').attr('disabled', true);
+				featureSelect.selectAll('option').attr('disabled', null);
+				featureSelect.node().selectedIndex = 0;
+				d3.select('#nullFeature').attr('disabled', true);
+				d3.select('#' + selectedTarget + 'Feature').attr('disabled', true);
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				if (selectedTarget) { 
+					createIndirectScatterPlot(selectedTarget, selectedFeature);
+					
+					var previousSelectedColorScaleIndex;
+					if (selectedColorScaleFeature && (selectedFeature == selectedColorScaleFeature)){
+						previousSelectedColorScaleIndex = Array.from(colorScaleSelect.node().options
+																		).map(x => x.id).indexOf(selectedColorScale+'ColorScale');
+					}
+
+					colorScaleFeatureSelect.selectAll('option').remove();
+					colorScaleSelect.selectAll('option').remove();
+					selectedColorFeatureScale = null, selectedColorScale = null;
+
+					d3.select('#divColorScale').attr('hidden', null);
+					colorScaleFeatureSelect.append('option')
+											.text('-')
+								    		.attr('value', ' ')
+											.attr('id', 'nullColorScale');
+					var colorScaleFeatureOptions = [sensitiveOptions[sensitiveAttrSelect.selectedIndex - 1]];
+					colorScaleFeatureSelect.selectAll('colorScaleFeatureOptions')
+							 			   .data(colorScaleFeatureOptions)
+							 			   .enter().append('option')
+							 			   .text(function (d) { return d.name; })
+							 			   .attr('value', function (d) { return d.value; })
+							 			   .attr('id', function (d) { return d.value+'ColorScaleFeature'; });
+					colorScaleFeatureSelect.on('change', selectColorScaleFeature);
+
+					if (previousSelectedColorScaleIndex){
+						colorScaleFeatureSelect.node().selectedIndex = 1;
+						selectColorScaleFeature();
+						colorScaleSelect.node().selectedIndex = previousSelectedColorScaleIndex;
+						selectColorScale();
+					}
+				};
+			};
+
+
+			function createIndirectScatterPlot(target, feature){
+				var margin = {top: 20, right: 20, bottom: 20, left: 20},
+					width = 400 - margin.left - margin.right,
+					height = 400 - margin.top - margin.bottom;
+
+				var data = eval(target + '_' + feature + '_scatter')[selectedModel];
+
+				d3.select('#divScatterPlot').selectAll('*').remove();
+				d3.select('#divScatterPlot').append('br');
+
+				var svgInit = d3.select('#divScatterPlot')
+								.append('svg')
+								.attr('id', 'svg_'+target+'_'+feature)
+								.attr('width', width)
+								.attr('height', height)
+								.attr('preserveAspectRatio', 'xMinYMin meet')
+								.attr('viewBox', '0 0 ' + (width + margin.left + margin.right) + ' ' + (height + margin.top + margin.bottom))
+
+				svgInit.append('rect')
+					   .attr('width', '100%')
+					   .attr('height', '100%')
+					   .attr('stroke', 'black')
+					   .attr('fill', 'white');
+				var svg = svgInit.append('g')
+								 .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+				var min_x = d3.min(data, function(d){ return parseFloat(d[feature+'_'+selectedDimReduction+'_x']); }) - .1,
+					max_x = d3.max(data, function(d){ return parseFloat(d[feature+'_'+selectedDimReduction+'_x']); }) + .1,
+					min_y = d3.min(data, function(d){ return parseFloat(d[feature+'_'+selectedDimReduction+'_y']); }) - .1,
+					max_y = d3.max(data, function(d){ return parseFloat(d[feature+'_'+selectedDimReduction+'_y']); }) + .1;
+
+				var x = d3.scaleLinear()
+						  .domain([min_x,max_x])
+						  .range([0, width]);
+				var y = d3.scaleLinear()
+						  .domain([min_y,max_y])
+						  .range([height, 0]);
+
+				var tooltip = d3.select('#divScatterPlot')
+								.append('div')
+								.attr('class', 'tooltip2')
+								.style('opacity', 0);
+
+				var brush = d3.brush()
+							  .extent([[0,0], [width, height]])
+							  .on("end", function(event, d){
+							  				extent = event.selection;
+							  				if(!extent){
+												if (!idleTimeout) return idleTimeout = setTimeout(idled, 350); // This allows to wait a little bit
+												x.domain([min_x,max_x]);
+												y.domain([min_y,max_y]);
+										    } else {
+										    	x.domain([extent[0][0], extent[1][0]].map(x.invert, x));
+										    	y.domain([extent[1][1], extent[0][1]].map(y.invert, y));
+										    	svg.select(".brush").call(brush.move, null);
+										    }
+										    svg.selectAll("circle").transition().duration(1000)
+										       .attr("cx", function(d) { return x(d[feature+'_'+selectedDimReduction+'_x']);})
+										       .attr("cy", function(d) { return y(d[feature+'_'+selectedDimReduction+'_y']); })
+							  			});
+
+				svg.append('g')
+				   .attr('class', 'brush')
+				   .call(brush);
+
+				svg.append('g')
+				   .selectAll('dot')
+				   .data(data)
+				   .enter()
+				   .append('circle')
+				   .attr('id', function(d) { return d.index.replaceAll("'",'-').replaceAll(' ', '_'); })
+				   .attr('cx', function(d) { return x(d[feature+'_'+selectedDimReduction+'_x']); })
+				   .attr('cy', function(d) { return y(d[feature+'_'+selectedDimReduction+'_y']); })
+				   .attr('r', width/50)
+				   .style('fill', 'lightblue')
+				   .style('opacity', .5)
+				   .on('mouseover', function(event,d) {
+				   						d3.select(this).attr('r', parseFloat(d3.select(this).attr('r')) * 1.5);
+				   						d3.select(this).attr('stroke', 'black');
+										tooltip.transition()
+											   .duration(200)
+											   .style("opacity", .9);
+										tooltip.style("left", (event.pageX) + "px")
+											   .style("top", (event.pageY - 28) + "px")
+											   .append('text').text(d.index).attr('alignment-baseline', 'middle');
+									})
+				   .on('mouseout', function(){
+				   						d3.select(this).attr('r', parseFloat(d3.select(this).attr('r')) / 1.5);
+				   						if (!d3.select(this).classed('clicked')) {
+				   							d3.select(this).attr('stroke', null);
+				   						}
+				   						tooltip.transition()
+				   							   .duration(50)
+				   							   .style('opacity', 0);
+				   						tooltip.selectAll('*').remove();
+				   				   })
+				   .on('click', function(){
+				   					var alreadyClicked = false;
+				   					if (d3.select(this).classed('clicked')) {
+				   						alreadyClicked = true;
+				   						d3.select('#slider').selectAll('*').remove();
+				   					}
+
+				   					d3.selectAll('circle').classed('clicked', false);
+				   					d3.selectAll('circle').attr('stroke', null);
+				   					selectColorScale();
+
+				   					if (!alreadyClicked) {
+				   						d3.select(this).classed('clicked', true);
+				   						d3.select(this).style('fill', 'red');
+				   						d3.select(this).attr('stroke', 'black');
+
+				   						var target = d3.select(this).attr('id');
+				   						showDetails(target);
+				   					}
+				   				});
+
+				
+
+				var idleTimeout
+			  	function idled() { idleTimeout = null; }
+			};
+
+			function resetColorScale(){
+				selectedColorScale = null;
+
+				d3.select('#divScatterPlot')
+				  .selectAll('circle')
+				  .style('fill', function(d){
+				  					if ((d3.select('#'+d.index.replaceAll("'",'-').replaceAll(' ', '_')).classed) && 
+				  						(d3.select('#'+d.index.replaceAll("'",'-').replaceAll(' ', '_')).attr('class') == 'clicked')){
+				  						return 'red';
+				  					} else {
+				  						return 'lightblue';
+				  					}
+				  				})
+				  .style('opacity', 0.8);
+				d3.select('#legend').remove();
+			};
+
+			function selectColorScaleFeature(){
+				resetColorScale();
+
+				var colorScaleFeatureSelect = d3.select('#colorScaleFeature').node();
+				var colorScaleSelect = d3.select('#colorScale');
+				selectedColorScaleFeature = colorScaleFeatureSelect.options[colorScaleFeatureSelect.selectedIndex].value;
+
+				colorScaleSelect.selectAll('option').remove();
+
+				colorScaleSelect.append('option')
+								.text('-')
+							    .attr('value', ' ')
+								.attr('id', 'nullColorScale');
+				
+				if (featureOptions.map(x => x.value).includes(selectedColorScaleFeature) | 
+					sensitiveOptions.map(x => x.value).includes(selectedColorScaleFeature)){
+					var data_corr = eval(selectedTarget + '_' + selectedColorScaleFeature + '_corr')[selectedModel];
+					var colorScaleOptions = Array.from(d3.group(data_corr, d => d[selectedColorScaleFeature]).keys());
+					if ((selectedColorScaleFeature != 'age') & (selectedColorScaleFeature != 'yob') & 
+						(selectedColorScaleFeature != 'gender')){ colorScaleOptions = colorScaleOptions.sort(); }
+
+					colorScaleSelect.selectAll('featureAttr')
+									.data(colorScaleOptions)
+									.enter()
+									.append('option')
+									.text(function (d) { return d; })
+									.attr('value', function (d) { return d; })
+									.attr('id', function (d) { return d+'ColorScale'; });
+				}
+				colorScaleSelect.on('change', selectColorScale);
+			};
+
+			function selectColorScale(){
+				var colorScaleSelect = d3.select('#colorScale').node();
+				if (colorScaleSelect.selectedIndex != -1){
+					selectedColorScale = colorScaleSelect.options[colorScaleSelect.selectedIndex].value;
+
+					if (featureOptions.map(x => x.value).includes(selectedColorScaleFeature) | 
+						sensitiveOptions.map(x => x.value).includes(selectedColorScaleFeature)){
+						var data_corr = eval(selectedTarget + '_' + selectedColorScaleFeature + '_corr')[selectedModel];
+						if (Array.from(d3.group(data_corr, d => d[selectedColorScaleFeature]).keys()).includes(selectedColorScale)){
+							var data_corr_filtered = data_corr.filter(x => x[selectedColorScaleFeature] == selectedColorScale);
+
+							d3.select('#divScatterPlot')
+							  .selectAll('circle')
+							  .style('fill', function(d){
+							  					if ((d3.select('#'+d.index.replaceAll("'",'-').replaceAll(' ', '_')).classed) && 
+							  						(d3.select('#'+d.index.replaceAll("'",'-').replaceAll(' ', '_')).attr('class') == 'clicked')){
+							  						return 'red';
+							  					} else {
+							  						var corr_coef = parseFloat(data_corr_filtered.filter(x => 
+							  														x[selectedTarget] == d.index
+							  											  	  )[0].indirect_correlation).toFixed(4);
+							  						return colorScale(corr_coef);
+							  					}
+							  				})
+							  .style('opacity', 1);
+							createLegend();
+						}
+					} else {
+						resetColorScale();
+					}
+				} else {
+					resetColorScale();
+				}
+			};
+
+			function createLegend(){
+				//d3.select('#divLegend').selectAll('*').remove();
+
+				d3.select('#legend').remove();
+
+				var scatterPlotDivDim = d3.select('#divScatterPlot').node().getBoundingClientRect();
+				var scatterPlotDim = d3.select('#svg_'+selectedTarget+'_'+selectedFeature).node().getBoundingClientRect();
+
+				var legend = Legend(colorScale, {title: 'Indirect correlation', tickValues: [colorScaleMin,0, colorScaleMax],
+												 tickFormat: function(d) {return colorScaleLegend[d]},
+												 marginLeft: (scatterPlotDim.x - scatterPlotDivDim.x), 
+												 width: scatterPlotDim.width + (scatterPlotDim.x - scatterPlotDivDim.x)});
+				//d3.select('#divLegend').node().appendChild(legend);
+
+				//var legend = Legend(colorScale, {'title': 'Indirect correlation', width: 380, marginLeft: 60});
+				legend.id = 'legend';
+				d3.select('#divScatterPlot')
+				  .node().appendChild(legend);
+			};
+
+
+			function showDetails(target){
+				var data_corr = eval(selectedTarget + '_' + selectedFeature + '_corr'
+									)[selectedModel].filter(x => x[selectedTarget] == target.replaceAll('-',"'").replaceAll('_',' '));
+				var data_indirect = eval(selectedTarget + '_' + selectedFeature + '_indirect')[selectedModel];
+				var features = Array.from(d3.group(data_corr, d => d[selectedFeature]).keys());
+				if ((selectedFeature != 'age') & (selectedFeature != 'yob') & 
+					(selectedFeature != 'gender')){ features = features.sort(); }
+
+				d3.select('#slider').selectAll('*').remove();
+
+				var sliderDivList = ['#slider'];
+
+				d3.select(sliderDivList[sliderDivList.length - 1])
+				  .append('div')
+				  .attr('id', 'slider-content')
+				  .attr('class', 'slider-content');
+
+				features.forEach(function(f){
+					var divId = 'div_' + target + '_' + f;
+					d3.select('#slider-content')
+					  .append('div')
+					  .attr('id', divId);
+					sliderDivList = sliderDivList.concat(['#'+divId]);
+				});
+
+				features.forEach(function(f){
+					var svgId = 'svg_' + target + '_' + f;
+					createIndirectPlot(data_indirect, svgId, 
+									   target.replaceAll('-',"'").replaceAll('_',' '), 
+									   f.replaceAll('-',"'").replaceAll('_',' '));
+				});
+			};
+
+			function createIndirectPlot(data, divId, x_name, y_name) {
+				var margin = {top: 40, right: 30, bottom: 30, left: 60},
+					width = 400 - margin.left - margin.right,
+					height = 350 - margin.top - margin.bottom;
+
+				var svg = d3.select('#' + divId.replace('svg','div'))
+							.append('svg')
+							.attr('id', divId)
+							.attr('preserveAspectRatio', 'xMinYMin meet')
+							.attr('viewBox', '0 0 ' + (width + margin.left + margin.right) + ' ' + (height + margin.top + margin.bottom))
+							.append('g')
+							.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+				var min_x = Math.round(d3.min(data, function(d){ return parseFloat(d[x_name]); }) * 2) / 2 - 0.5,
+					max_x = Math.round(d3.max(data, function(d){ return parseFloat(d[x_name]); }) * 2) / 2 + 0.5,
+					min_y = Math.round(d3.min(data, function(d){ return parseFloat(d[y_name]); }) * 2) / 2 - 0.5,
+					max_y = Math.round(d3.max(data, function(d){ return parseFloat(d[y_name]); }) * 2) / 2 + 0.5;
+
+				var x = d3.scaleLinear()
+						  .domain([min_x,max_x])
+						  .range([0, width]);
+				var y = d3.scaleLinear()
+						  .domain([min_y,max_y])
+						  .range([height, 0]);
+
+				svg.append('rect')
+					.attr('width', width)
+		   			.attr('height', height)
+		   			.attr('fill', 'white')
+		   			.attr('stroke', 'black')
+		   			.attr('stroke-width', .4);
+
+				svg.append('g')
+				   .style('font-size', '50%')
+				   .attr('transform', 'translate(0,' + height + ')')
+				   .call(d3.axisBottom(x));
+				svg.append('g')
+				   .style('font-size', '50%')
+				   .call(d3.axisLeft(y));
+
+				svg.append("text")
+				   .attr("text-anchor", "end")
+				   .attr('font-size', '70%')
+				   .attr("x", width/2 + margin.left/3)
+				   .attr("y", height + margin.top)
+				   .text(x_name);
+				svg.append("text")
+				   .attr("text-anchor", "end")
+				   .attr('font-size', '70%')
+				   .attr("transform", "rotate(-90)")
+				   .attr("y", -margin.left + 30)
+				   .attr("x", -margin.top - height/3 + 5)
+				   .text(y_name);
+
+
+				var tooltip = d3.select('#' + divId.replace('svg','div'))
+								.append('div')
+								.attr('class', 'tooltip')
+								.style('opacity', 0);
+
+				svg.append('g')
+				   .selectAll('dot')
+				   .data(data)
+				   .enter()
+				   .append('circle')
+				   .attr('id', function(d) { return d.index; })
+				   .attr('cx', function(d) { return x(d[x_name]); })
+				   .attr('cy', function(d) { return y(d[y_name]); })
+				   .attr('r', 2)
+				   .style("fill", 'lightblue')
+				   .style('opacity', .5)
+				   .on('mouseover', function(event,d) {
+				   						d3.select(this).style('fill', 'red').style('opacity', .8);
+										tooltip.transition()
+											   .duration(200)
+											   .style("opacity", .9);
+
+										let rect = d3.select(this).node().parentElement.parentElement.getBoundingClientRect();
+
+										tooltip.html(d.index + 
+													 '<br/> ' + x_name + ': ' + (Math.round((parseFloat(d[x_name]) + Number.EPSILON) * 1e4) / 1e4) + 
+													 '<br/> ' + y_name + ': ' + (Math.round((parseFloat(d[y_name]) + Number.EPSILON) * 1e4) / 1e4) )
+											   .style('left', (event.x - rect.left + 10) + 'px')
+											   .style('bottom', (rect.bottom - event.y) + 'px');
+									})
+				   .on('mouseout', function(){
+				   						if( !d3.select(this).classed('clicked')){
+					   						d3.select(this).style('fill', 'lightblue');
+				   						}
+				   						tooltip.transition()
+				   							   .duration(500)
+				   							   .style('opacity', 0);
+				   				   });
+
+				var xSeries = data.map(function(d){ return parseFloat(d[x_name]); });
+				var ySeries = data.map(function(d){ return parseFloat(d[y_name]); });
+				var leastSquaresCoeff = leastSquares(xSeries, ySeries);
+				var trendData = [leastSquaresLimit(leastSquaresCoeff, [min_x, max_x, min_y, max_y])]
+				var trendline = svg.selectAll(".trendline")
+								   .data(trendData);
+				trendline.enter()
+						 .append("line")
+						 .attr("class", "trendline")
+						 .attr("x1", function(d) { return x(d[0]); })
+						 .attr("y1", function(d) { return y(d[1]); })
+						 .attr("x2", function(d) { return x(d[2]); })
+						 .attr("y2", function(d) { return y(d[3]); })
+						 .attr("stroke", "black")
+						 .attr("stroke-width", 1);
+			};
+
+			function leastSquares(xSeries, ySeries) {
+				var reduceSumFunc = function(prev, cur) { return prev + cur; };
+
+				var xBar = xSeries.reduce(reduceSumFunc) * 1.0 / xSeries.length;
+				var yBar = ySeries.reduce(reduceSumFunc) * 1.0 / ySeries.length;
+
+				var ssXX = xSeries.map(function(d) { return Math.pow(d - xBar, 2); })
+					.reduce(reduceSumFunc);
+
+				var ssYY = ySeries.map(function(d) { return Math.pow(d - yBar, 2); })
+					.reduce(reduceSumFunc);
+					
+				var ssXY = xSeries.map(function(d, i) { return (d - xBar) * (ySeries[i] - yBar); })
+					.reduce(reduceSumFunc);
+					
+				var slope = ssXY / ssXX;
+				var intercept = yBar - (xBar * slope);
+				var rSquare = Math.pow(ssXY, 2) / (ssXX * ssYY);
+
+				return [slope, intercept, rSquare];
+			};
+
+			function leastSquaresLimit(leastSquaresCoeff, plotLimits){
+				var y1 = leastSquaresCoeff[0] * plotLimits[0] + leastSquaresCoeff[1],
+					y2 = leastSquaresCoeff[0] * plotLimits[1] + leastSquaresCoeff[1];
+
+				if (y1 < plotLimits[2]){
+					var y_min_lim = plotLimits[2],
+						x_min_lim = (y_min_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else if (y1 > plotLimits[3]){
+					var y_min_lim = plotLimits[3],
+						x_min_lim = (y_min_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else {
+					var y_min_lim = y1,
+						x_min_lim = plotLimits[0];
+				}
+				if (y2 > plotLimits[3]){
+					var y_max_lim = plotLimits[3],
+						x_max_lim = (y_max_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else if (y2 < plotLimits[2]){
+					var y_max_lim = plotLimits[2],
+						x_max_lim = (y_max_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else {
+					var y_max_lim = y2,
+						x_max_lim = plotLimits[1];
+				}
+
+				return [x_min_lim, y_min_lim, x_max_lim, y_max_lim];
+			};
+			
+
+
+			loadFilesInit();
+			loadFiles();
+			setTimeout(function(){
+				setUpVisualisation();
+			}, delay);
+	
+		</script>
+	</body>
+</html>
