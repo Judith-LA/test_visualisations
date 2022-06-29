@@ -1,0 +1,83 @@
+body {
+	font-family: 'Source Sans Pro', sans-serif;
+	background-color: #E8E8E8;
+}
+
+h1 {
+	text-align: center;
+}
+
+div.tooltip {
+	position: relative;
+	text-align: center;
+	width: 85px;
+	height: 28px;
+	padding: 2px;
+	font: 8px sans-serif;
+	background: lightsteelblue;
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+div.tooltip2 {
+	position: absolute;
+	text-align: center;
+	width: 50px;
+	padding: 2px;
+	font: 8px sans-serif;
+	background: lightsteelblue;
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+.clicked {
+	fill: 'red';
+	stroke: 'black';
+	opacity: .8;
+}
+
+.slider {
+  overflow:auto;
+  height:300px;
+  width: 600px;
+  margin: 10px auto;
+  position: relative;
+}
+
+.slider-viewport {
+  width: 600px;
+  height: 300px;
+  overflow: hidden;
+}
+
+.slider-content {
+  display: grid;
+  grid-auto-flow: column;
+  transition: 1s all;
+}
+.slider-content svg {
+  width: 300px;
+  height: 300px;
+}
+
+/*.slider-nav {
+  position: relative;
+  top:  110px;
+  width: 100%;
+  text-align: center;
+}
+.slider-nav a {
+  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.3);
+  display: inline-block;
+  background-color: #adafbc;
+  width: 15px;
+  height: 15px;
+  margin: 0 3px;
+}
+.slider-nav a:hover {
+  background-color: #fff;
+  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.8);
+}*/
+
