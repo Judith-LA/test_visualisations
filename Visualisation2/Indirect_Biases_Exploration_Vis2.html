@@ -26,8 +26,8 @@
 		</div>
 
 		<script type="text/javascript">
-			//var models = ['bert-base', 'bert-large', 'xl-base', 'xl-large'];
-			var models = ['bert-base'];
+			var models = ['bert-base', 'bert-large', 'xl-base', 'xl-large'];
+			//var models = ['bert-base'];
 			var  dimReductions = [{'name': 't-SNE', 'value': 'tsne'},
 								  {'name': 'UMAP', 'value': 'umap'},
 								  {'name': 'ISOMAP', 'value': 'isomap'}]
@@ -684,6 +684,8 @@
 			};
 
 			function selectColorScale(){
+				resetColorScale();
+
 				var colorScaleSelect = d3.select('#colorScale').node();
 				if (colorScaleSelect.selectedIndex != -1){
 					selectedColorScale = colorScaleSelect.options[colorScaleSelect.selectedIndex].value;
@@ -710,11 +712,7 @@
 							  .style('opacity', 1);
 							createLegend();
 						}
-					} else {
-						resetColorScale();
 					}
-				} else {
-					resetColorScale();
 				}
 			};
 
