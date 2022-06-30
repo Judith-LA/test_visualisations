@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<script type = "text/javascript" src="https://d3js.org/d3.v7.min.js"></script>
+		<script type="text/javascript" src="../legend.js"></script>
+		<link href='http://fonts.googleapis.com/css?family=Lato:400,700' rel='stylesheet' type='text/css'>
+		<link href="https://fonts.googleapis.com/css2?family=Assistant&display=swap" rel="stylesheet">
+		<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200&family=Source+Sans+Pro:wght@300&display=swap" rel="stylesheet">
+		<link rel="stylesheet" href="style.css"></link>
+		<title>Indirect Bias Exploration - Visualisation 1</title>
+	</head>
+
+	<body>
+		<h1> Indirect Bias Exploration - Visualisation 1</h1>
+
+		<div style='width:100%;'>
+			<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
+			<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
+			<div id='divSorting' style='text-align: center; width:50%; float: right;'></div>
+		</div>
+		<div>
+			<div id='divTable' class='indirectTable' style='width: 95%; padding: 0 20;'>
+				<br>
+				<table id='tableFull' hidden></table>
+				<table id='tableSort' hidden></table>
+			</div>
+			<div id='divLegend' style='text-align: center; float: right; margin-right: 5%;'></div>
+		</div>
+		<div style='width:100%;'>
+			<div id='divIndirectScatterPlot' style='text-align: center; width:50%; float: left;'></div>
+		</div>
+
+
+		<script type="text/javascript">
+			var models = ['bert-base', 'bert-large', 'xl-base', 'xl-large'];
+			//var models = ['bert-base'];
+			var target_attributes = ['beverage', 'country', 'occupation', 'sport'];
+			var sensitive_attributes = ['age', 'gender', 'race', 'religion', 'sexual_orientation', 'yob'];
+
+			var columnOptions = [{'name': 'Beverage', 'value': 'beverage'}, 
+								 {'name': 'Country', 'value': 'country'}, 
+								 {'name': 'Occupation', 'value': 'occupation'},
+								 {'name': 'Sport', 'value': 'sport'}]
+			var rowOptions = [{'name': 'Beverage', 'value': 'beverage'},
+							  {'name': 'Country', 'value': 'country'}, 
+							  {'name': 'Occupation', 'value': 'occupation'},
+							  {'name': 'Sport', 'value': 'sport'},
+							  {'name': 'Mental and Physical Traits', 'value': 'trait'}]
+			var sensitiveOptions = [{'name': 'Age', 'value': 'age'},
+									{'name': 'Gender', 'value': 'gender'},
+									{'name': 'Race', 'value': 'race'},
+									{'name': 'Religion', 'value': 'religion'},
+									{'name': 'Sexual Orientation', 'value': 'sexual_orientation'},
+									{'name': 'Year of Birth', 'value': 'yob'}]
+
+			
+			var colorScaleMin = -1, colorScaleMax = 1;
+			var colorScale = d3.scaleSequential()
+								.domain([colorScaleMin,colorScaleMax])
+								.interpolator(d3.interpolatePuOr);
+			var colorScaleLegend = {0: 'no correlation'};
+			//colorScaleLegend[colorScaleMin] = 'strong -', colorScaleLegend[colorScaleMax] = 'strong +';
+			//colorScaleLegend[colorScaleMin] = 'strong negative - correlation', colorScaleLegend[colorScaleMax] = 'strong positive - correlation';
+			colorScaleLegend[colorScaleMin] = 'strongly negative', colorScaleLegend[colorScaleMax] = 'strongly positive';
+
+			var clicks = {};
+			var similarityData = {};
+
+			var selectedModel;
+			var selectedColumn, selectedRow, sortingColumn, sortingRow;
+			var columnHeaders, rowHeaders, rowsContent, columns, rows;
+
+			var sortingCol, sortingRow, sortingOnColumn, sortingOnSimilarity;
+
+			var topN = 5;
+
+			var delay = 200;
+
+
+			function array_product(a,b){
+				var sum = 0
+				for (var i = 0; i < a.length; i++){
+					sum += a[i]*b[i];
+				}
+				return sum / a.length;
+			};
+
+			function cosine_similarity(a,b){
+				var num = array_product(a,b);
+				var a_norm = Math.sqrt(a.map(x => x**2).reduce((x,y) => x+y, 0));
+				var b_norm = Math.sqrt(b.map(x => x**2).reduce((x,y) => x+y, 0));
+				return num / (a_norm*b_norm);
+			};
+
+			function getKeyByValue(object, value) {
+				return Object.keys(object).find(key => object[key] === value);
+			};
+
+
+			function loadFilesInit(){
+				target_attributes.forEach(function(t1){
+					target_attributes.forEach(function(t2){
+						if (t1 != t2){
+							this[t1 + '_' + t2 + '_corr'] = {};
+							this[t1 + '_' + t2 + '_indirect'] = {};
+							//this[t1 + '_' + t2 + '_sim'] = {};
+							var d_corr = eval(t1 + '_' + t2 + '_corr');
+							var d_indirect = eval(t1 + '_' + t2 + '_indirect');
+							//var d_sim = eval(t1 + '_' + t2 + '_sim');
+							models.forEach(function(m){;
+								d_corr[m] = null;
+								d_indirect[m] = null;
+								//d_sim[m] = null;
+							});
+						}
+					});
+
+					this[t1 + '_trait' + '_corr'] = {};
+					this[t1 + '_trait' + '_indirect'] = {};
+					//this[t1 + '_trait' + '_sim'] = {};
+					var d_corr = eval(t1 + '_trait' + '_corr');
+					var d_indirect = eval(t1 + '_trait'+ '_indirect');
+					//var d_sim = eval(t1 + '_trait' + '_sim');
+					models.forEach(function(m){;
+						d_corr[m] = null;
+						d_indirect[m] = null;
+						//d_sim[m] = null;
+					});
+
+					sensitive_attributes.forEach(function(s){
+						this[t1 + '_' + s + '_corr'] = {};
+						this[t1 + '_' + s + '_indirect'] = {};
+						//this[t1 + '_' + s + '_sim'] = {};
+						var d_corr = eval(t1 + '_' + s + '_corr');
+						var d_indirect = eval(t1 + '_' + s + '_indirect');
+						//var d_sim = eval(t1 + '_' + s + '_sim');
+						models.forEach(function(m){
+							d_corr[m] = null;
+							d_indirect[m] = null;
+							//d_sim[m] = null;
+						});
+					});
+				});
+
+				models.forEach(function(m){
+					similarityData[m] = {};
+				});
+			};
+
+			function loadFiles(){
+				models.forEach(function(m){
+					target_attributes.forEach(function(t1){
+						target_attributes.forEach(function(t2){
+							if (t1 != t2){
+								var d_corr = eval(t1 + '_' + t2 + '_corr');
+								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_correlation.csv").then(function(data){
+									d_corr[m] = data;
+								});
+								var d_indirect = eval(t1 + '_' + t2 + '_indirect');
+								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_indirect.csv").then(function(data){
+									d_indirect[m] = data;
+								});
+							}
+						});
+
+						var d_corr = eval(t1 + '_trait' + '_corr');
+						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_correlation.csv").then(function(data){
+							d_corr[m] = data;
+
+							var d_corr_target = d3.group(data, d => d[t1]);
+							var target_elements = Array.from(d_corr_target.keys());
+							target_elements.forEach(function(tElm1){
+								var tElm1_sim = {};
+								target_elements.forEach(function(tElm2){
+									if (tElm1 != tElm2){
+										var tElm1_corr = d_corr_target.get(tElm1).map(x => parseFloat(x.indirect_correlation));
+										var tElm2_corr = d_corr_target.get(tElm2).map(x => parseFloat(x.indirect_correlation));
+										tElm1_sim[tElm2] = cosine_similarity(tElm1_corr,tElm2_corr);
+									}
+								});
+								similarityData[m][tElm1] = tElm1_sim;
+							});
+
+							var d_corr_feature = d3.group(data, d => d['trait']);
+							var feature_elements = Array.from(d_corr_feature.keys());
+							feature_elements.forEach(function(fElm1){
+								var fElm1_sim = {};
+								feature_elements.forEach(function(fElm2){
+									if (fElm1 != fElm2){
+										var fElm1_corr = d_corr_feature.get(fElm1).map(x => parseFloat(x.indirect_correlation));
+										var fElm2_corr = d_corr_feature.get(fElm2).map(x => parseFloat(x.indirect_correlation));
+										fElm1_sim[fElm2] = cosine_similarity(fElm1_corr,fElm2_corr);
+									}
+								});
+								similarityData[m][fElm1] = fElm1_sim;
+							});
+						});
+						var d_indirect = eval(t1 + '_trait'+ '_indirect');
+						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_indirect.csv").then(function(data){
+							d_indirect[m] = data;
+						});
+
+						sensitive_attributes.forEach(function(s){
+							var d_corr = eval(t1 + '_' + s + '_corr');
+							//var d_sim = eval(t1 + '_' + s + '_sim');
+							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_correlation.csv").then(function(data){
+								d_corr[m] = data;
+
+								var d_corr_feature = d3.group(data, d => d[s]);
+								var feature_elements = Array.from(d_corr_feature.keys());
+								if (!Object.keys(similarityData[m]).includes(feature_elements[0])){
+									feature_elements.forEach(function(fElm1){
+										var fElm1_sim = {};
+										feature_elements.forEach(function(fElm2){
+											if (fElm1 != fElm2){
+												var fElm1_corr = d_corr_feature.get(fElm1).map(x => parseFloat(x.indirect_correlation));
+												var fElm2_corr = d_corr_feature.get(fElm2).map(x => parseFloat(x.indirect_correlation));
+												fElm1_sim[fElm2] = cosine_similarity(fElm1_corr,fElm2_corr);
+											}
+										});
+										similarityData[m][fElm1] = fElm1_sim;
+									});
+								}
+							});
+							var d_indirect = eval(t1 + '_' + s + '_indirect');
+							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_indirect.csv").then(function(data){
+								d_indirect[m] = data;
+							});
+						});
+					});
+					
+
+				});
+			};
+
+
+			function setUpVisualisation(){
+				d3.select('#divModel').text('Choose the model to use');
+				d3.select('#divModel').append('br');
+
+				var modelSelect = d3.select('#divModel')
+									.append('select')
+									.attr('id', 'modelSelect')
+									.attr('name', 'modelSelect');
+				modelSelect.append('option')
+						   .text('-')
+						   .attr('value', ' ')
+						   .attr('id', 'nullModel');
+				modelSelect.selectAll('modelOptions')
+						   .data(models)
+						   .enter()
+						   .append('option')
+						   .text(function (d) { return d; })
+						   .attr('value', function (d) { return d; })
+						   .attr('id', function (d) { return d; });
+				modelSelect.on('change', selectModel);
+
+				d3.select('#divSelection').text('Choose the attributes to compare');
+				d3.select('#divSelection').append('br');
+
+				var columnSelect = d3.select('#divSelection')
+									 .append('select')
+									 .attr('id', 'AttrOnCol')
+									 .attr('name', 'AttrOnCol');
+				columnSelect.append('option')
+							.text('-')
+							//.text('Target attribute on column')
+							.attr('value', ' ')
+							.attr('id', 'nullColumn');
+				columnSelect.selectAll('colOptions')
+							.data(columnOptions)
+							.enter()
+							.append('option')
+							.text(function (d) { return d.name; })
+							.attr('value', function (d) { return d.value; })
+							.attr('id', function (d) { return d.value+'Column'; });
+				columnSelect.on('change', selectTableColumn);
+				columnSelect.on('mouseover', function(){ 
+												d3.select('#columnSelectLabel').attr('hidden', null); 
+												d3.select('#nullLabel').attr('hidden', true); 
+											})
+				columnSelect.on('mouseout', function(){ 
+												d3.select('#columnSelectLabel').attr('hidden', true); 
+												d3.select('#nullLabel').attr('hidden', null); 
+											})
+
+				var rowSelect = d3.select('#divSelection')
+								  .append('select')
+								  .attr('id', 'AttrOnRow')
+								  .attr('name', 'AttrOnRow');
+				rowSelect.append('option')
+						 .text('-')
+						 .attr('value', ' ')
+						 .attr('id', 'nullRow');
+				rowSelect.selectAll('rowOptions')
+						 .data(rowOptions)
+						 .enter()
+						 .append('option')
+						 .text(function (d) { return d.name; })
+						 .attr('value', function (d) { return d.value; })
+						 .attr('id', function (d) { return d.value+'Row'; });
+				rowSelect.on('change', selectTableRow);
+				rowSelect.on('mouseover', function(){ 
+												d3.select('#rowSelectLabel').attr('hidden', null); 
+												d3.select('#nullLabel').attr('hidden', true); 
+											})
+				rowSelect.on('mouseout', function(){ 
+												d3.select('#rowSelectLabel').attr('hidden', true); 
+												d3.select('#nullLabel').attr('hidden', null); 
+											})
+
+				var sensitiveAttrSelect = d3.select('#divSelection')
+											.append('select')
+											.attr('id', 'SensitiveAttrOnRow')
+											.attr('name', 'SensitiveAttrOnRow');
+				sensitiveAttrSelect.append('option')
+								   .text('-')
+								   .attr('value', ' ')
+								   .attr('id', 'nullSensitiveAttr');
+				sensitiveAttrSelect.selectAll('sensitiveRowOptions')
+								   .data(sensitiveOptions)
+								   .enter()
+								   .append('option')
+								   .text(function (d) { return d.name; })
+								   .attr('value', function (d) { return d.value; })
+								   .attr('id', function (d) { return d.value+'SensitiveRow'; });
+				sensitiveAttrSelect.on('change', selectTableSensitiveRow);
+				sensitiveAttrSelect.on('mouseover', function(){ 
+												d3.select('#sensitiveAttrSelectLabel').attr('hidden', null); 
+												d3.select('#nullLabel').attr('hidden', true); 
+											})
+				sensitiveAttrSelect.on('mouseout', function(){ 
+												d3.select('#sensitiveAttrSelectLabel').attr('hidden', true); 
+												d3.select('#nullLabel').attr('hidden', null); 
+											})
+
+				d3.select('#divSelection').append('br');
+
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'nullLabel')
+				  .style('color', '#E8E8E8')
+				  .text('---')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'columnSelectLabel')
+				  .attr('for', 'AttrOnCol')
+				  .attr('hidden', true)
+				  .text('Target attribute on column')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+				  .append('Label')
+				  .attr('id', 'rowSelectLabel')
+				  .attr('for', 'AttrOnRow')
+				  .attr('hidden', true)
+				  .text('Feature attribute on row')
+				  .style('font-size', '80%');
+				d3.select('#divSelection')
+	   			  .append('Label')
+	   			  .attr('id', 'sensitiveAttrSelectLabel')
+	   			  .attr('for', 'SensitiveAttrOnRow')
+	   			  .attr('hidden', true)
+	   			  .text('Sensitive attribute on row')
+				  .style('font-size', '80%');
+
+				d3.select('#divSelection').attr('hidden', true);
+
+				var legend = Legend(colorScale, {title: 'Indirect correlation', tickValues: [colorScaleMin,0, colorScaleMax],
+												 tickFormat: function(d) {return colorScaleLegend[d]}, tickSize: 2 });
+				d3.select('#divLegend').node().appendChild(legend);
+				d3.select('#divLegend').attr('hidden', true);
+			};
+
+			function selectModel(){
+				var modelSelect = d3.select('#modelSelect').node();
+				selectedModel = modelSelect.options[modelSelect.selectedIndex].value;
+
+				d3.select('#nullModel').attr('disabled', true);
+				d3.select('#divSelection').attr('hidden', null);
+
+				d3.select('#divLegend').attr('hidden', true);
+
+				if (selectedRow && selectedColumn){ 
+					if (sortingCol){
+						var previous_row_order = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+													x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					} else if (sortingRow){
+						var previous_col_order = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+													x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					}
+
+					createIndirectBiasTableFull(selectedColumn, selectedRow);
+
+					var columns = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+											x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var rows = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+											x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (sortingCol && columns.includes(sortingCol)){
+						clicks[sortingCol] --;
+						columnSorting(sortingCol);
+					} else if (sortingCol){
+						createIndirectBiasTableSort(selectedColumn, selectedRow, columns, previous_row_order, sortingCol)
+						if (sortingOnSimilarity){
+							var sortingText = '<b>' + selectedRow + '</b> sorted based on: <b>' + sortingCol+ '</b>';
+							d3.select('#divSorting').html(sortingText);
+						}
+					} else if (sortingRow && rows.includes(sortingRow)) {
+						clicks[sortingRow] --;
+						rowSorting(sortingRow);
+					} else if (sortingRow){
+						createIndirectBiasTableSort(selectedColumn, selectedRow, previous_col_order, rows, sortingRow)
+						if (sortingOnSimilarity){
+							var sortingText = '<b>' + selectedColumn + '</b> sorted based on: <b>' + sortingRow + '</b>';
+							d3.select('#divSorting').html(sortingText);
+						}
+					} else {
+						d3.select('#divSorting').text('');
+					}
+				}
+
+				if (d3.select('#divIndirectScatterPlot').node().hasChildNodes()){
+					var data_indirect = eval(selectedColumn + '_' + selectedRow + '_indirect')[selectedModel];
+					var svg_id_split = d3.select('#divIndirectScatterPlot').node().childNodes[0].id.split('_');
+					if ((svg_id_split[0] in data_indirect[0]) & (svg_id_split[1] in data_indirect[0])){
+						createIndirectPlot(data_indirect, svg_id_split[0], svg_id_split[1])
+					} else {
+						d3.select('#divIndirectScatterPlot').selectAll('*').remove();
+					}
+				}
+			};
+
+			function selectTableColumn(){
+				d3.select('#divIndirectScatterPlot').selectAll('*').remove();
+
+				var columnSelect = d3.select('#AttrOnCol').node();
+				var rowSelect = d3.select('#AttrOnRow');
+				var sensitiveAttrSelect = d3.select('#SensitiveAttrOnRow');
+				selectedColumn = columnSelect.options[columnSelect.selectedIndex].value;
+				
+				d3.select('#nullColumn').attr('disabled', true);
+				rowSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullRow').attr('disabled', true);
+				d3.select('#' + selectedColumn + 'Row').attr('disabled', true);
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				d3.select('#divLegend').attr('hidden', true);
+
+				if (selectedRow){
+					if (sortingCol){
+						var previous_row_order = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+													x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					}
+
+					createIndirectBiasTableFull(selectedColumn, selectedRow);
+
+					var columns = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+										x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var rows = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+										x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (sortingRow && rows.includes(sortingRow)) {
+						clicks[sortingRow] --;
+						rowSorting(sortingRow);
+					} else if (sortingCol && columns.includes(sortingCol)){
+						clicks[sortingCol] --;
+						columnSorting(sortingCol);
+					} else if (sortingCol){
+						createIndirectBiasTableSort(selectedColumn, selectedRow, columns, previous_row_order, sortingCol);
+
+						var rows_order = d3.select('#tableSort').select('tbody').selectAll('tr').nodes().map(
+													x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+						var rows_full = d3.select('#tableFull').select('tbody').selectAll('tr');
+						rows_full.sort(function(a,b){
+							var aScore = rows_order.indexOf(a[selectedRow]);
+							var bScore = rows_order.indexOf(b[selectedRow]);
+							return aScore - bScore;
+						});
+
+						if (sortingOnSimilarity){
+							var sortingText = '<b>' + selectedRow + '</b> sorted based on: <b>' + sortingCol+ '</b>';
+							d3.select('#divSorting').html(sortingText);
+						}
+					}
+				};
+			};
+
+			function selectTableRow(){
+				d3.select('#divIndirectScatterPlot').selectAll('*').remove();
+				
+				var columnSelect = d3.select('#AttrOnCol');
+				var rowSelect = d3.select('#AttrOnRow').node();
+				var sensitiveAttrSelect = d3.select('#SensitiveAttrOnRow');
+				selectedRow = rowSelect.options[rowSelect.selectedIndex].value;
+
+				columnSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullColumn').attr('disabled', true);
+				d3.select('#nullRow').attr('disabled', true);
+				d3.select('#' + selectedRow + 'Column').attr('disabled', true);
+				sensitiveAttrSelect.selectAll('option').attr('disabled', null);
+				sensitiveAttrSelect.node().selectedIndex = 0;
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				d3.select('#divLegend').attr('hidden', true);
+
+				if (selectedColumn) { 
+					if (sortingRow){
+						var previous_col_order = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+													x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					}
+
+					createIndirectBiasTableFull(selectedColumn, selectedRow);
+
+					var columns = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+										x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var rows = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+										x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (sortingCol && columns.includes(sortingCol)){
+						clicks[sortingCol] --;
+						columnSorting(sortingCol);
+					} else if (sortingRow && rows.includes(sortingRow)){
+						clicks[sortingRow] --;
+						rowSorting(sortingRow);
+					} else if (sortingRow){
+						createIndirectBiasTableSort(selectedColumn, selectedRow, previous_col_order, rows, sortingRow);
+
+						var col_order = d3.select('#tableSort').select('thead').selectAll('th').nodes().map(
+											x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+						var column_full_headers = d3.select('#tableFull').select('thead').select('tr').selectAll('th');
+						var rows_full_content = d3.select('#tableFull').select('tbody').selectAll('tr').selectAll('td');
+						column_full_headers.sort(function(a,b){
+							var aScore = col_order.indexOf(a[selectedColumn]);
+							var bScore = col_order.indexOf(b[selectedColumn]);
+							return aScore - bScore;
+						});
+						rows_full_content.sort(function(a,b){
+							var aScore = col_order.indexOf(a[selectedColumn]);
+							var bScore = col_order.indexOf(b[selectedColumn]);
+							return aScore - bScore;
+						});
+
+						if (sortingOnSimilarity){
+							var sortingText = '<b>' + selectedColumn + '</b> sorted based on: <b>' + sortingRow + '</b>';
+							d3.select('#divSorting').html(sortingText);
+						}
+					}
+
+					
+				};
+			};
+
+			function selectTableSensitiveRow(){
+				d3.select('#divIndirectScatterPlot').selectAll('*').remove();
+				
+				var columnSelect = d3.select('#AttrOnCol');
+				var rowSelect = d3.select('#AttrOnRow');
+				var sensitiveAttrSelect = d3.select('#SensitiveAttrOnRow').node();
+				selectedRow = sensitiveAttrSelect.options[sensitiveAttrSelect.selectedIndex].value;
+
+				columnSelect.selectAll('option').attr('disabled', null);
+				d3.select('#nullColumn').attr('disabled', true);
+				rowSelect.selectAll('option').attr('disabled', null);
+				rowSelect.node().selectedIndex = 0;
+				d3.select('#nullRow').attr('disabled', true);
+				d3.select('#' + selectedColumn + 'Row').attr('disabled', true);
+				d3.select('#nullSensitiveAttr').attr('disabled', true);
+
+				d3.select('#divLegend').attr('hidden', true);
+
+				if (selectedColumn){ 
+					if (sortingRow){
+						var previous_col_order = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+													x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					}
+
+					createIndirectBiasTableFull(selectedColumn, selectedRow);
+
+					var columns = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+										x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var rows = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+										x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (sortingCol && columns.includes(sortingCol)){
+						clicks[sortingCol] --;
+						columnSorting(sortingCol);
+					} else if (sortingRow && rows.includes(sortingRow)){
+						clicks[sortingRow] --;
+						rowSorting(sortingRow);
+					} else if (sortingRow){
+						createIndirectBiasTableSort(selectedColumn, selectedRow, previous_col_order, rows, sortingRow);
+
+						var col_order = d3.select('#tableSort').select('thead').selectAll('th').nodes().map(
+											x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+						var column_full_headers = d3.select('#tableFull').select('thead').select('tr').selectAll('th');
+						var rows_full_content = d3.select('#tableFull').select('tbody').selectAll('tr').selectAll('td');
+						column_full_headers.sort(function(a,b){
+							var aScore = col_order.indexOf(a[selectedColumn]);
+							var bScore = col_order.indexOf(b[selectedColumn]);
+							return aScore - bScore;
+						});
+						rows_full_content.sort(function(a,b){
+							var aScore = col_order.indexOf(a[selectedColumn]);
+							var bScore = col_order.indexOf(b[selectedColumn]);
+							return aScore - bScore;
+						});
+
+						if (sortingOnSimilarity){
+							var sortingText = '<b>' + selectedColumn + '</b> sorted based on: <b>' + sortingRow + '</b>';
+							d3.select('#divSorting').html(sortingText);
+						}
+					}
+				};
+			};
+
+
+			function createIndirectBiasTableFull(column_name, row_name){
+				d3.select('#tableFull').selectAll('*').remove();
+				d3.select('#tableSort').attr('hidden', true);
+
+				var data = eval(column_name + '_' + row_name + '_corr')[selectedModel];
+				var data_indirect = eval(column_name + '_' + row_name + '_indirect')[selectedModel];
+
+				var column_data = Array.from(d3.group(data, d => d[column_name]).keys());
+				//if ((column_name != 'age') & (column_name != 'yob') & (column_name != 'gender')){ column_data = column_data.sort(); };
+				column_data = column_data.sort();
+				var row_data = Array.from(d3.group(data, d => d[row_name]).keys());
+				if ((row_name != 'age') & (row_name != 'yob') & (row_name != 'gender')){ row_data = row_data.sort(); }
+
+				var table = d3.select('#tableFull');
+				table.attr('hidden', null);
+				var thead = table.append('thead');
+				var	tbody = table.append('tbody');
+
+				var diagCell = thead.append('tr')
+									.append('td')
+									.attr('class', 'diag');
+				diagCell.append('div')
+						.attr('class', 'top')
+						.text(column_name);
+				diagCell.append('div')
+						.attr('class', 'bottom')
+						.text(row_name);
+
+				var data_per_column = [], data_per_row = [];
+				column_data.forEach(function(c){
+					if (!Object.keys(clicks).includes(c)) {clicks[c] = 0;}
+					var col = {};
+					col[column_name] = c;
+					var filteredData = data.filter(x => x[column_name] == c);
+					filteredData.forEach(function(d){
+						col[d[row_name]] = parseFloat(d.indirect_correlation).toFixed(4);
+					});
+					data_per_column.push(col);
+				});
+				row_data.forEach(function(r){
+					if (!Object.keys(clicks).includes(r)) {clicks[r] = 0;}
+					var row = {};
+					row[row_name] = r;
+					var filteredData = data.filter(x => x[row_name] == r);
+					filteredData.forEach(function(d){
+						row[d[column_name]] = parseFloat(d.indirect_correlation).toFixed(4);
+					});
+					data_per_row.push(row);
+				});
+
+				columnHeaders = thead.select('tr').selectAll('th')
+												  .data(data_per_column, function(d){ return d[column_name]; })
+												  .enter()
+												  .append('th')
+												  .attr('id', function(d) { return 'colID_' + 
+												  									d[column_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+												  .text(function(d) { return d[column_name]; });				  
+				rowHeaders = tbody.selectAll('tr')
+								  .data(data_per_row, function(d){ return d[row_name]; })
+								  .enter()
+								  .append('tr')
+								  .attr('id', function(d) { return 'rowID_' + 
+												  					d[row_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+								  .append('th')
+								  .text(function(d) { return d[row_name]; });
+
+				tbody.selectAll('tr').selectAll('td')
+									 .data(function(d){
+										var arr = [];
+										column_data.forEach(function(c){
+											var row = {};
+											row[row_name] = d[row_name];
+											row[column_name] = c;
+											row['indirect_correlation'] = d[c];
+											row['color'] = colorScale(d[c]);
+											arr.push(row)
+										});
+										return arr;
+									 })
+									 .enter()
+									 .append('td')
+									 .attr('id', function(d) { return 'cellID_' + d[column_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+									 .text(function(d) { return d.indirect_correlation; })
+									 .style('background-color', function(d) { return d.color; })
+									 .style('color', function(d) { return d.color; })
+									 .on('mouseover', function() { d3.select(this).style('color', 'black'); })
+									 .on('mouseout', function() { d3.select(this).style('color', d3.select(this).style('background-color')); })
+									 .on('click', function(){ 
+					  					var cell = d3.select(this).node();
+					  					var cellRowName = cell.parentNode.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+					  					var cellColName = cell.id.split('cellID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+					  					createIndirectPlot(data_indirect, cellColName, cellRowName);
+						  			 });
+					
+				rows = tbody.selectAll('tr');
+				rowsContent = tbody.selectAll('tr').selectAll('td');
+
+				columnHeaders.on('click', function(){
+											var col = d3.select(this).node().id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+											rows.sort(function(a,b){
+												if (clicks[col] % 3 != 2){ //create table with sorting rows (descending order)
+													if (parseFloat(a[col]) < parseFloat(b[col])){
+														return 1;
+													} else if (parseFloat(a[col])  > parseFloat(b[col])){
+														return -1;
+													} else {
+														return 0;
+													}
+												}
+											});
+
+											columnSorting(col);
+										});
+				rowHeaders.on('click', function(){
+										var row = d3.select(this).node().parentNode.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+										columnHeaders.sort(function(a,b){
+											if (clicks[row] % 3 != 2) { //create table with sorting columns (descending order)
+												if (parseFloat(a[row]) < parseFloat(b[row]) ){
+													return 1;
+												} else if (parseFloat(a[row])  > parseFloat(b[row])){
+													return -1;
+												} else {
+													return 0;
+												}
+											}
+										});
+
+										var colOrder = columnHeaders.nodes().map(x => x.id.split('colID_')[1])
+										rowsContent.sort(function(a,b){
+											var aScore = colOrder.indexOf(a[column_name].replaceAll("'",'-').replaceAll(' ', '_'));
+											var bScore = colOrder.indexOf(b[column_name].replaceAll("'",'-').replaceAll(' ', '_'));
+											return aScore - bScore;
+										});
+
+										rowSorting(row);
+								   });
+			
+				d3.select('#divLegend').attr('hidden', null);
+			};
+
+			function createIndirectBiasTableSort(column_name, row_name, column_order, row_order, clickAttr){
+				d3.select('#tableFull').attr('hidden', true);
+				d3.select('#tableSort').selectAll('*').remove();
+
+				var data = eval(column_name + '_' + row_name + '_corr')[selectedModel];
+				var data_indirect = eval(column_name + '_' + row_name + '_indirect')[selectedModel];
+				var data_sim = similarityData[selectedModel];
+
+				var column_data, row_data;
+				if (sortingOnColumn){
+					if (sortingOnSimilarity && column_order.includes(clickAttr)){
+						var tableFullCols = d3.select('#tableFull').select('thead').selectAll('th').nodes(
+											).map(x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+						var colSimilarities_data = data_sim[clickAttr];
+						var colSimilarities = Object.values(colSimilarities_data).sort( function(a,b){return a - b} 
+													).map(x => getKeyByValue(colSimilarities_data, x)
+													).concat([clickAttr]).reverse().filter(x => tableFullCols.includes(x));
+
+						if (colSimilarities.length >= 2*topN + 1){
+							column_data = colSimilarities.slice(0, topN + 1).concat(['...']
+											).concat(colSimilarities.slice(colSimilarities.length - topN));
+						} else {
+							column_data = colSimilarities;
+						}
+						row_data = row_order;
+					} else {
+						column_data = column_order;
+						if (row_order.length >= 2*topN && column_order.includes(clickAttr)){
+							row_data = row_order.slice(0, topN).concat(['...']).concat(row_order.slice(row_order.length - topN));
+						} else {
+							row_data = row_order;
+						}
+					}	
+				} else {
+					if (sortingOnSimilarity && row_order.includes(clickAttr)){
+						column_data = column_order;
+
+						var tableFullRows = d3.select('#tableFull').select('tbody').selectAll('tr').nodes(
+											).map(x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+						var rowSimilarities_data = data_sim[clickAttr];
+						var rowSimilarities = Object.values(rowSimilarities_data).sort( function(a,b){return a - b} 
+													).map(x => getKeyByValue(rowSimilarities_data, x)
+													).concat([clickAttr]).reverse().filter(x => tableFullRows.includes(x));
+
+						
+						if (rowSimilarities.length >= 2*topN + 1){
+							row_data = rowSimilarities.slice(0, topN + 1).concat(['...']
+											).concat(rowSimilarities.slice(rowSimilarities.length - topN));
+						} else {
+							row_data = rowSimilarities;
+						}
+					} else {
+						if (column_order.length >= 2*topN && row_order.includes(clickAttr)){
+							column_data = column_order.slice(0, topN).concat(['...']).concat(column_order.slice(column_order.length - topN));
+						} else {
+							column_data = column_order;
+						}
+						row_data = row_order
+					}
+				}
+
+				var table = d3.select('#tableSort');
+				table.attr('hidden', null);
+				var thead = table.append('thead');
+				var tbody = table.append('tbody'); 
+
+				var diagCell = thead.append('tr')
+									.append('td')
+									.attr('class', 'diag');
+				diagCell.append('div')
+						.attr('class', 'top')
+						.text(column_name);
+				diagCell.append('div')
+						.attr('class', 'bottom')
+						.text(row_name);
+
+				var data_per_column = [], data_per_row = [];
+				column_data.forEach(function(c){
+					var col = {};
+					col[column_name] = c;
+					if (c != '...'){
+						var filteredData = data.filter(x => x[column_name] == c);
+						filteredData.forEach(function(d){
+							col[d[row_name]] = parseFloat(d.indirect_correlation).toFixed(4);
+						});
+						if ('...' in row_data) {
+							col['...'] = '...'
+						};
+					} else {
+						row_data.forEach(function(r){
+							col[r] = '...';
+						})
+					}
+					data_per_column.push(col);
+				});
+				row_data.forEach(function(r){
+					var row = {};
+					row[row_name] = r;
+					row['...'] = '...';
+					if (r != '...'){
+						var filteredData = data.filter(x => x[row_name] == r);
+						filteredData.forEach(function(d){
+							row[d[column_name]] = parseFloat(d.indirect_correlation).toFixed(4);
+						});
+					} else {
+						column_data.forEach(function(c){
+							row[c] = '...';
+						})
+					}
+					data_per_row.push(row);
+				});
+
+				columnHeaders = thead.select('tr').selectAll('th')
+												  .data(data_per_column, function(d){ return d[column_name]; })
+												  .enter()
+												  .append('th')
+												  .attr('id', function(d) { return 'colID_' + 
+												  									d[column_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+												  .text(function(d) { return d[column_name]; });				  
+				rowHeaders = tbody.selectAll('tr')
+								  .data(data_per_row, function(d){ return d[row_name]; })
+								  .enter()
+								  .append('tr')
+								  .attr('id', function(d) { return 'rowID_' + 
+								  									d[row_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+								  .append('th')
+								  .text(function(d) { return d[row_name]; });
+
+				tbody.selectAll('tr').selectAll('td')
+									 .data(function(d){
+										var arr = [];
+										column_data.forEach(function(c){
+											var row = {};
+											row[row_name] = d[row_name];
+											row[column_name] = c;
+											row['indirect_correlation'] = d[c];
+											arr.push(row)
+										});
+										return arr;
+									 })
+									 .enter()
+									 .append('td')
+									 .attr('id', function(d) { return 'cellID_' + d[column_name].replaceAll("'",'-').replaceAll(' ', '_'); })
+									 .text(function(d) { return d.indirect_correlation; })
+									 .style('background-color', function(d) { 
+									 								if(d.indirect_correlation == '...'){ return '#ababab'; } 
+									 								else { return colorScale(d.indirect_correlation);} })
+									 .style('color', function(d) { 
+									 					if(d.indirect_correlation == '...'){ return '#ababab'; } 
+									 					else { return colorScale(d.indirect_correlation);} })
+									 .on('mouseover', function() { d3.select(this).style('color', 'black'); })
+									 .on('mouseout', function() { d3.select(this).style('color', d3.select(this).style('background-color')); })
+									 .on('click', function(){ 
+					  					var cell = d3.select(this).node();
+					  					var cellRowName = cell.parentNode.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+					  					var cellColName = cell.id.split('cellID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+					  					createIndirectPlot(data_indirect, cellColName, cellRowName);
+						  			 });
+	
+				columnHeaders.on('click', function(){
+											var col = d3.select(this).node().id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+											var rows = d3.select('#tableFull').select('tbody').selectAll('tr');
+											rows.sort(function(a,b){
+												if (clicks[col] % 3 != 2) { //create sorting table
+													if (parseFloat(a[col]) < parseFloat(b[col])){
+														return 1;
+													} else if (parseFloat(a[col])  > parseFloat(b[col])){
+														return -1;
+													} else {
+														return 0;
+													}
+												}
+											});
+
+											columnSorting(col);
+										});
+				rowHeaders.on('click', function(){
+										var row = d3.select(this).node().parentNode.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' ');
+										var columnHeadersFull = d3.select('#tableFull').select('thead').selectAll('th');
+										var rowsContentFull = d3.select('#tableFull').select('tbody').selectAll('tr').selectAll('td');
+										columnHeadersFull.sort(function(a,b){
+											if (clicks[row] % 3 != 2) { //create sorting table
+												if (parseFloat(a[row]) < parseFloat(b[row]) ){
+													return 1;
+												} else if (parseFloat(a[row])  > parseFloat(b[row])){
+													return -1;
+												} else {
+													return 0;
+												}
+											} 
+										});
+
+										var colOrderFull = columnHeadersFull.nodes().map(x => x.id.split('colID_')[1])
+										rowsContentFull.sort(function(a,b){
+											var aScore = colOrderFull.indexOf(a[column_name].replaceAll("'",'-').replaceAll(' ', '_'));
+											var bScore = colOrderFull.indexOf(b[column_name].replaceAll("'",'-').replaceAll(' ', '_'));
+											return aScore - bScore;
+										});
+
+										rowSorting(row);
+								   });
+			};
+
+			function columnSorting(col){
+				sortingOnColumn = true;
+				sortingOnSimilarity = null;
+
+				d3.select('#tableFull').select('thead').selectAll('th').style('background-color','white');
+				d3.select('#tableSort').select('thead').selectAll('th').style('background-color','white');
+				d3.select('#tableFull').select('thead').selectAll('th').style('color','black');
+				d3.select('#tableSort').select('thead').selectAll('th').style('color','black');
+
+				d3.select('#tableFull').select('tbody').selectAll('th').style('background-color','white');
+				d3.select('#tableSort').select('tbody').selectAll('th').style('background-color','white');
+				d3.select('#tableFull').select('tbody').selectAll('th').style('color','black');
+				d3.select('#tableSort').select('tbody').selectAll('th').style('color','black');
+
+				var sortingText =  '';
+
+				if (col != sortingCol){ clicks[col] = 0; }
+
+				var columnHeadersFull = d3.select('#tableFull').select('thead').selectAll('th');
+				columnHeadersFull.sort(function(a,b){
+					if (clicks[col] % 3 == 2) {
+						if (a[selectedColumn] < b[selectedColumn]){
+							return -1;
+						} else if (a[selectedColumn] > b[selectedColumn]){
+							return 1;
+						} else {
+							return 0;
+						}
+					}
+				});
+
+				var rowsFull = d3.select('#tableFull').select('tbody').selectAll('tr');
+				rowsFull.sort(function(a,b){
+					if (clicks[col] % 3 != 2) { //create sorting table - descending order
+						if (parseFloat(a[col]) < parseFloat(b[col])){
+							return 1;
+						} else if (parseFloat(a[col])  > parseFloat(b[col])){
+							return -1;
+						} else {
+							return 0;
+						}
+					} else {
+						if (a[selectedRow] < b[selectedRow]){
+							return -1;
+						} else if (a[selectedRow] > b[selectedRow]){
+							return 1;
+						} else {
+							return 0;
+						}
+					}
+				});
+
+				if (clicks[col] % 3 == 2){ // alphabetical order
+					sortingCol = null;
+
+					d3.select('#tableSort').attr('hidden', true);
+					d3.select('#tableFull').attr('hidden', null);
+				} else {
+					sortingCol = col;
+
+					var col_order = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+										x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var row_order = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+										x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (clicks[col] % 3 == 1){ sortingOnSimilarity = true; }
+
+					createIndirectBiasTableSort(selectedColumn, selectedRow, col_order, row_order, col);
+
+					var col_id = '#colID_' + col.replaceAll("'",'-').replaceAll(' ', '_');
+
+					d3.select('#tableFull').select('thead').select(col_id).style('background-color',colorScale(colorScaleMax));
+					d3.select('#tableSort').select('thead').select(col_id).style('background-color',colorScale(colorScaleMax));
+					d3.select('#tableFull').select('thead').select(col_id).style('color', 'white');
+					d3.select('#tableSort').select('thead').select(col_id).style('color', 'white');
+
+					if (clicks[col] % 3 == 0) { //create sorting table rows - descending order
+						sortingText = '<b>' + selectedRow + '</b> sorted based on: <b>' + col + '</b>';
+					} else { 
+						sortingText = '<b>' + selectedRow + '</b> and <b>' + selectedColumn + '</b> sorted based on: <b>' + col + '</b>';
+					}
+				}
+
+				clicks[col]++;
+				sortingRow = null;
+
+				d3.select('#divSorting').html(sortingText);
+			};
+
+			function rowSorting(row){
+				sortingOnColumn = false;
+				sortingOnSimilarity = null;
+
+				d3.select('#tableFull').select('thead').selectAll('th').style('background-color','white');
+				d3.select('#tableSort').select('thead').selectAll('th').style('background-color','white');
+				d3.select('#tableFull').select('thead').selectAll('th').style('color','black');
+				d3.select('#tableSort').select('thead').selectAll('th').style('color','black');
+
+				d3.select('#tableFull').select('tbody').selectAll('th').style('background-color','white');
+				d3.select('#tableSort').select('tbody').selectAll('th').style('background-color','white');
+				d3.select('#tableFull').select('tbody').selectAll('th').style('color','black');
+				d3.select('#tableSort').select('tbody').selectAll('th').style('color','black');
+
+				var sortingText =  '';
+
+				if (row != sortingRow){ clicks[row] = 0; }
+
+				var columnHeadersFull = d3.select('#tableFull').select('thead').selectAll('th');
+				columnHeadersFull.sort(function(a,b){
+					if (clicks[row] % 3 != 2) { //create sorting table - descending order
+						if (parseFloat(a[row]) < parseFloat(b[row]) ){
+							return 1;
+						} else if (parseFloat(a[row])  > parseFloat(b[row])){
+							return -1;
+						} else {
+							return 0;
+						}
+					} else {
+						if (a[selectedColumn] < b[selectedColumn]){
+							return -1;
+						} else if (a[selectedColumn] > b[selectedColumn]){
+							return 1;
+						} else {
+							return 0;
+						}
+					}
+				});
+
+				var rowsContentFull = d3.select('#tableFull').select('tbody').selectAll('tr').selectAll('td');
+				var colOrderFull = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(x => x.id.split('colID_')[1])
+				rowsContentFull.sort(function(a,b){
+					var aScore = colOrderFull.indexOf(a[selectedColumn].replaceAll("'",'-').replaceAll(' ', '_'));
+					var bScore = colOrderFull.indexOf(b[selectedColumn].replaceAll("'",'-').replaceAll(' ', '_'));
+					return aScore - bScore;
+				});
+
+				var rowsFull = d3.select('#tableFull').select('tbody').selectAll('tr');
+				rowsFull.sort(function(a,b){
+					if (clicks[row] % 3 == 2) {
+						if (a[selectedRow] < b[selectedRow]){
+							return -1;
+						} else if (a[selectedRow] > b[selectedRow]){
+							return 1;
+						} else {
+							return 0;
+						}
+					}
+				});
+
+				if (clicks[row] % 3 == 2){
+					sortingRow = null;
+
+					d3.select('#tableSort').attr('hidden', true);
+					d3.select('#tableFull').attr('hidden', null);
+				} else { 
+					sortingRow = row;
+
+					var col_order = d3.select('#tableFull').select('thead').selectAll('th').nodes().map(
+										x => x.id.split('colID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+					var row_order = d3.select('#tableFull').select('tbody').selectAll('tr').nodes().map(
+										x => x.id.split('rowID_')[1].replaceAll('-',"'").replaceAll('_',' '));
+
+					if (clicks[row] % 3 == 1){ sortingOnSimilarity = true; }
+
+					createIndirectBiasTableSort(selectedColumn, selectedRow, col_order, row_order, row);
+
+					var row_id = '#rowID_' + row.replaceAll("'",'-').replaceAll(' ', '_');
+					d3.select('#tableFull').select('tbody').select(row_id).select('th').style('background-color',colorScale(colorScaleMax));
+					d3.select('#tableSort').select('tbody').select(row_id).select('th').style('background-color',colorScale(colorScaleMax));
+					d3.select('#tableFull').select('tbody').select(row_id).select('th').style('color', 'white');
+					d3.select('#tableSort').select('tbody').select(row_id).select('th').style('color', 'white');
+
+					if (clicks[row] % 3 == 0) { //create sorting table - descending order
+						sortingText = '<b>' + selectedColumn + '</b> sorted based on: <b>' + row + '</b>';
+					} else { //create sorting table - ascending order
+						sortingText = '<b>' + selectedColumn + '</b> and <b>' + selectedRow + '</b> sorted based on: <b>' + row + '</b>';
+					}
+				}
+
+				clicks[row]++;
+				sortingCol = null;
+
+				d3.select('#divSorting').html(sortingText);
+			};
+
+
+			function createIndirectPlot(data, x_name, y_name) {
+				var margin = {top: 10, right: 30, bottom: 30, left: 60},
+					width = 400 - margin.left - margin.right,
+					height = 150 - margin.top - margin.bottom;
+
+				d3.select('#divIndirectScatterPlot').selectAll('*').remove();
+
+				var svg = d3.select('#divIndirectScatterPlot')
+							.append('svg')
+							.attr('id', x_name+'_'+y_name)
+							.attr('preserveAspectRatio', 'xMinYMin meet')
+							.attr('viewBox', '0 0 ' + (width + margin.left + margin.right) + ' ' + (height + margin.top + margin.bottom))
+							.append('g')
+							.attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+				var min_x = Math.round(d3.min(data, function(d){ return parseFloat(d[x_name]); }) * 2) / 2 - 0.5,
+					max_x = Math.round(d3.max(data, function(d){ return parseFloat(d[x_name]); }) * 2) / 2 + 0.5,
+					min_y = Math.round(d3.min(data, function(d){ return parseFloat(d[y_name]); }) * 2) / 2 - 0.5,
+					max_y = Math.round(d3.max(data, function(d){ return parseFloat(d[y_name]); }) * 2) / 2 + 0.5;
+
+				var x = d3.scaleLinear()
+						  .domain([min_x,max_x])
+						  .range([0, width]);
+				var y = d3.scaleLinear()
+						  .domain([min_y,max_y])
+						  .range([height, 0]);
+
+				svg.append('rect')
+				   .attr('width', width)
+				   .attr('height', height)
+				   .attr('fill', 'white')
+				   .attr('stroke', 'black')
+				   .attr('stroke-width', .4);
+
+				svg.append('g')
+				   .style('font-size', '50%')
+				   .attr('transform', 'translate(0,' + height + ')')
+				   .call(d3.axisBottom(x));
+				svg.append('g')
+				   .style('font-size', '50%')
+				   .call(d3.axisLeft(y));
+
+				svg.append("text")
+				   .attr("text-anchor", "end")
+				   .attr('font-size', '50%')
+				   .attr("x", width/2 + margin.left/3)
+				   .attr("y", height + margin.top + 15)
+				   .text(x_name);
+				svg.append("text")
+				   .attr("text-anchor", "end")
+				   .attr('font-size', '50%')
+				   .attr("transform", "rotate(-90)")
+				   .attr("y", -margin.left + 25)
+				   .attr("x", -margin.top - height/2 + 15)
+				   .text(y_name);
+
+
+				var tooltip = d3.select('#divIndirectScatterPlot')
+								.append('div')
+								.attr('class', 'tooltip')
+								.style('opacity', 0);
+
+				svg.append('g')
+				   .selectAll('dot')
+				   .data(data)
+				   .enter()
+				   .append('circle')
+				   .attr('id', function(d) { return d.index; })
+				   .attr('cx', function(d) { return x(d[x_name]); })
+				   .attr('cy', function(d) { return y(d[y_name]); })
+				   .attr('r', 2)
+				   .style("fill", 'lightblue')
+				   .style('opacity', .5)
+				   .on('mouseover', function(event,d) {
+				   						d3.select(this).style('fill', 'red').style('opacity', .8);
+										tooltip.transition()
+											   .duration(200)
+											   .style("opacity", .9);
+										tooltip.html(d.index + 
+													 '<br/> ' + x_name + ': ' + (Math.round((parseFloat(d[x_name]) + Number.EPSILON) * 1e4) / 1e4) + 
+													 '<br/> ' + y_name + ': ' + (Math.round((parseFloat(d[y_name]) + Number.EPSILON) * 1e4) / 1e4) )
+											   .style("left", (event.pageX) + "px")
+											   .style("top", (event.pageY - 28) + "px");
+									})
+				   .on('mouseout', function(){
+				   						if( !d3.select(this).classed('clicked')){
+					   						d3.select(this).style('fill', 'lightblue');
+				   						}
+				   						tooltip.transition()
+				   							   .duration(500)
+				   							   .style('opacity', 0);
+				   				   });
+
+				var xSeries = data.map(function(d){ return parseFloat(d[x_name]); });
+				var ySeries = data.map(function(d){ return parseFloat(d[y_name]); });
+				var leastSquaresCoeff = leastSquares(xSeries, ySeries);
+				var trendData = [leastSquaresLimit(leastSquaresCoeff, [min_x, max_x, min_y, max_y])]
+				var trendline = svg.selectAll(".trendline")
+								   .data(trendData);
+				trendline.enter()
+						 .append("line")
+						 .attr("class", "trendline")
+						 .attr("x1", function(d) { return x(d[0]); })
+						 .attr("y1", function(d) { return y(d[1]); })
+						 .attr("x2", function(d) { return x(d[2]); })
+						 .attr("y2", function(d) { return y(d[3]); })
+						 .attr("stroke", "black")
+						 .attr("stroke-width", 1);
+			};
+
+			function leastSquares(xSeries, ySeries) {
+				var reduceSumFunc = function(prev, cur) { return prev + cur; };
+
+				var xBar = xSeries.reduce(reduceSumFunc) * 1.0 / xSeries.length;
+				var yBar = ySeries.reduce(reduceSumFunc) * 1.0 / ySeries.length;
+
+				var ssXX = xSeries.map(function(d) { return Math.pow(d - xBar, 2); })
+					.reduce(reduceSumFunc);
+
+				var ssYY = ySeries.map(function(d) { return Math.pow(d - yBar, 2); })
+					.reduce(reduceSumFunc);
+					
+				var ssXY = xSeries.map(function(d, i) { return (d - xBar) * (ySeries[i] - yBar); })
+					.reduce(reduceSumFunc);
+					
+				var slope = ssXY / ssXX;
+				var intercept = yBar - (xBar * slope);
+				var rSquare = Math.pow(ssXY, 2) / (ssXX * ssYY);
+
+				return [slope, intercept, rSquare];
+			};
+
+			function leastSquaresLimit(leastSquaresCoeff, plotLimits){
+				var y1 = leastSquaresCoeff[0] * plotLimits[0] + leastSquaresCoeff[1],
+					y2 = leastSquaresCoeff[0] * plotLimits[1] + leastSquaresCoeff[1];
+
+				if (y1 < plotLimits[2]){
+					var y_min_lim = plotLimits[2],
+						x_min_lim = (y_min_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else if (y1 > plotLimits[3]){
+					var y_min_lim = plotLimits[3],
+						x_min_lim = (y_min_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else {
+					var y_min_lim = y1,
+						x_min_lim = plotLimits[0];
+				}
+				if (y2 > plotLimits[3]){
+					var y_max_lim = plotLimits[3],
+						x_max_lim = (y_max_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else if (y2 < plotLimits[2]){
+					var y_max_lim = plotLimits[2],
+						x_max_lim = (y_max_lim - leastSquaresCoeff[1]) / leastSquaresCoeff[0];
+				} else {
+					var y_max_lim = y2,
+						x_max_lim = plotLimits[1];
+				}
+
+				return [x_min_lim, y_min_lim, x_max_lim, y_max_lim];
+			};
+
+			
+			loadFilesInit();
+			loadFiles();
+			setTimeout(function(){
+				setUpVisualisation();
+			}, delay);
+
+		</script>
+	</body>
+</html>

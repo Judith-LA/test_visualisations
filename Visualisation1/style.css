@@ -1,0 +1,136 @@
+body {
+	/*font-family: 'Lato', sans-serif;*/
+	/*font-family: 'Assistant', sans-serif;*/
+	font-family: 'Source Sans Pro', sans-serif;
+	background-color: #E8E8E8;
+}
+
+h1 {
+	text-align: center;
+}
+
+.indirectTable {
+  overflow:auto;
+  height:270px;
+}
+table, th, td {
+	border: 1px solid black;
+	border-collapse: collapse;
+	text-align: center;
+	vertical-align: middle;
+	font-size: 80%;
+}
+table {
+  	table-layout: fixed;
+  	width:100%;
+}
+td, th {
+  	width: 80px;
+  	height:  15px;
+}
+th {background-color:white;}
+
+td:first-child, th:first-child {
+  position:sticky;
+  left:0;
+  z-index:1;
+}
+thead tr th {
+  position:sticky;
+  top:0;
+}
+
+.diag {
+	font-weight: bold;
+	z-index:2;
+	width: 120px;
+
+	background-image: -webkit-gradient(linear, right top, left bottom, color-stop(49%, white), color-stop(50%, black), , color-stop(51%, white));
+	background-image: -webkit-linear-gradient(top right, white 49%, black 50%, white 51%);
+	background-image: -o-linear-gradient(top right, white 49%, black 50%, white 51%);
+	background-image: linear-gradient(to bottom left, white 49%, black 50%, white 51%);
+}
+
+.top {
+	-webkit-transform: translate(20px,0px);
+		-ms-transform: translate(20px,0px);
+			transform: translate(20px,0px);
+}
+
+.bottom {
+	-webkit-transform: translate(-20px,0px);
+		-ms-transform: translate(-20px,0px);
+			transform: translate(-20px,0px);
+}
+
+div.tooltip {
+	position: absolute;
+	text-align: center;
+	width: 80px;
+	height: 28px;
+	padding: 2px;
+	font: 8px sans-serif;
+	background: lightsteelblue;
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+/*.slider {
+  width: 600px;
+  margin: 10px auto;
+  position: relative;
+}
+
+.slider-viewport {
+  width: 600px;
+  height: 200px;
+  overflow: hidden;
+}
+
+.slider-content {
+  display: grid;
+  grid-auto-flow: column;
+  transition: 1s all;
+}
+.slider-content svg {
+  width: 300px;
+  height: 200px;
+}
+
+.slider-nav {
+  position: relative;
+  top:  110px;
+  width: 100%;
+  text-align: center;
+}
+.slider-nav a {
+  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.3);
+  display: inline-block;
+  background-color: #adafbc;
+  width: 15px;
+  height: 15px;
+  margin: 0 3px;
+}
+.slider-nav a:hover {
+  background-color: #fff;
+  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.8);
+}
+
+#divAgeYobPlot:target .slider-content {
+  transform: translateX(-300px);
+}
+#divYobRace:target .slider-content {
+  transform: translateX(-600px);
+}
+#divRaceReligion:target .slider-content {
+  transform: translateX(-900px);
+}
+#divReligionSexualOrientation:target .slider-content {
+  transform: translateX(-1200px);
+}*/
+
+.clicked {
+	fill: 'red';
+	opacity: .8;
+}
