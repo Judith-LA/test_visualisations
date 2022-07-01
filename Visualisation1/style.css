@@ -1,6 +1,4 @@
 body {
-	/*font-family: 'Lato', sans-serif;*/
-	/*font-family: 'Assistant', sans-serif;*/
 	font-family: 'Source Sans Pro', sans-serif;
 	background-color: #E8E8E8;
 }
@@ -10,8 +8,8 @@ h1 {
 }
 
 .indirectTable {
-  overflow:auto;
-  height:270px;
+  overflow: auto;
+  height: 230px;
 }
 table, th, td {
 	border: 1px solid black;
@@ -76,61 +74,26 @@ div.tooltip {
 	pointer-events: none;
 }
 
-/*.slider {
-  width: 600px;
-  margin: 10px auto;
-  position: relative;
-}
-
-.slider-viewport {
-  width: 600px;
-  height: 200px;
-  overflow: hidden;
-}
-
-.slider-content {
-  display: grid;
-  grid-auto-flow: column;
-  transition: 1s all;
-}
-.slider-content svg {
-  width: 300px;
-  height: 200px;
-}
-
-.slider-nav {
-  position: relative;
-  top:  110px;
-  width: 100%;
-  text-align: center;
-}
-.slider-nav a {
-  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.3);
-  display: inline-block;
-  background-color: #adafbc;
-  width: 15px;
-  height: 15px;
-  margin: 0 3px;
-}
-.slider-nav a:hover {
-  background-color: #fff;
-  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.8);
-}
-
-#divAgeYobPlot:target .slider-content {
-  transform: translateX(-300px);
-}
-#divYobRace:target .slider-content {
-  transform: translateX(-600px);
-}
-#divRaceReligion:target .slider-content {
-  transform: translateX(-900px);
-}
-#divReligionSexualOrientation:target .slider-content {
-  transform: translateX(-1200px);
-}*/
-
 .clicked {
 	fill: 'red';
 	opacity: .8;
+}
+
+button {
+	margin: 0 auto; 
+	display:block;
+	font-size: 16px;
+	background-color: #B0B0B0;
+  color: black;
+  border: 2px solid #B0B0B0;
+  border-radius: 10px;
+  text-align: center;
+  text-decoration: none;
+  padding: 8px 40px;
+  transition-duration: 0.5s;
+}
+
+button:hover{
+  background-color: #E8E8E8;
+  color: black;
 }
