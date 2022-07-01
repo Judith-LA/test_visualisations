@@ -6,22 +6,50 @@
 		<script type="text/javascript" src="../legend.js"></script>
 		<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200&family=Source+Sans+Pro:wght@300&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="style.css"></link>
-		<title>Indirect Bias Exploration - Visualisation 2</title>
+		<title>Indirect Bias Exploration - Visualization 2</title>
 	</head>
 	<body>
-		<h1> Indirect Bias Exploration - Visualisation 2</h1>
+		<div id='introductionDiv'>
+			<h1> Indirect Bias Exploration - Visualization 2</h1>
+			<h2> Introduction </h2>
 
-		<div>
-			<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
-			<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
-			<div id='divColorScale' style='text-align: center; width:50%; float: right;'></div>
-		</div>
-		<div>
-			<div id='scatterDetails' style='text-align: center; width:50%; float: right;'>
-				<div id='slider' class='slider'></div>
+			
+				<p> 
+					The purpose of this visualization is to explore the potential biases learned by NLP transformer models, machine learning models which can be used to deal with human language. 
+				</p>
+
+				<p> 
+					You will be able to choose a target category attribute (e.g. sport) and see the correlations made by the chosen model with different feature category attributes (e.g. beverage or trait). 
+					It is also possible to investigate the correlations between the target and feature attributes and some <em>sensitive</em> attributes (such as gender or religion), to check whether the target and feature elements could be linked by some indirect correlations with these sensitive features. The correlation scores for different models are available. 
+				</p>
+
+				<p>	
+					The visualization is composed of a scatterplot, where each dot represents an element from the chosen target category. The position of the dots is defined by the feature category. High-dimensional vectors are derived from the correlation scores between the target and feature elements, which are mapped to a 2-dimensional space using a dimensionality reduction. Different dimensionality reductions are available. 
+					A color scale can be applied to explore whether it exists a correlation between the target elements and a selected feature or <em>sensitive</em>  element, and how strong this correlation is. 
+					The correlations are generated using names as a bridge, which are linked to the target and feature elements. It is possible to explore these links by clicking on the dots of the scatterplot.
+				</p>
+
+			<div>
+				<br/>
+				<button onclick="displayVisulization()"> Go to Visualization </button>
 			</div>
-			<div style='text-align: center; width:50%; float: left;'>
-				<div id='divScatterPlot' style='text-align: center; width: 95%;'></div>
+		</div>
+
+		<div id="visualizationDiv" hidden>
+			<h1> Indirect Bias Exploration - Visualization 2</h1>
+
+			<div>
+				<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
+				<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
+				<div id='divColorScale' style='text-align: center; width:50%; float: right;'></div>
+			</div>
+			<div>
+				<div id='scatterDetails' style='text-align: center; width:50%; float: right;'>
+					<div id='slider' class='slider'></div>
+				</div>
+				<div style='text-align: center; width:50%; float: left;'>
+					<div id='divScatterPlot' style='text-align: center; width: 95%;'></div>
+				</div>
 			</div>
 		</div>
 
@@ -163,7 +191,7 @@
 			};
 
 
-			function setUpVisualisation(){
+			function setUpVisualization(){
 				d3.select('#divModel').text('Choose the model and dimensionality reduction to use');
 				d3.select('#divModel').append('br');
 
@@ -930,14 +958,21 @@
 
 				return [x_min_lim, y_min_lim, x_max_lim, y_max_lim];
 			};
-			
 
+
+			function displayVisulization(){
+				d3.select('#introductionDiv').attr('hidden', true);
+				d3.select('#visualizationDiv').attr('hidden', null);
+			};
+			
 
 			loadFilesInit();
 			loadFiles();
 			setTimeout(function(){
-				setUpVisualisation();
+				setUpVisualization();
 			}, delay);
+
+
 	
 		</script>
 	</body>
