@@ -12,8 +12,6 @@
 		<div id='introductionDiv'>
 			<h1> Indirect Bias Exploration - Visualization 2</h1>
 			<h2> Introduction </h2>
-
-			
 				<p> 
 					The purpose of this visualization is to explore the potential biases learned by NLP transformer models, machine learning models which can be used to deal with human language. 
 				</p>
@@ -46,6 +44,30 @@
 			<div>
 				<div id='scatterDetails' style='text-align: center; width:50%; float: right;'>
 					<div id='slider' class='slider'></div>
+					<div>
+						<div id='explanationsNull' style="height: 130px;"></div>
+						<div id='explanations' style="text-align: left; height: 130px; overflow: auto;" hidden>
+							<p> 
+								The purpose of this visualization is to explore the potential biases learned by NLP transformer models, machine learning models which can be used to deal with human language. 
+							</p>
+
+							<p> 
+								You will be able to choose a target category attribute (e.g. sport) and see the correlations made by the chosen model with different feature category attributes (e.g. beverage or trait). 
+								It is also possible to investigate the correlations between the target and feature attributes and some <em>sensitive</em> attributes (such as gender or religion), to check whether the target and feature elements could be linked by some indirect correlations with these sensitive features. The correlation scores for different models are available. 
+							</p>
+
+							<p>	
+								The visualization is composed of a scatterplot, where each dot represents an element from the chosen target category. The position of the dots is defined by the feature category. High-dimensional vectors are derived from the correlation scores between the target and feature elements, which are mapped to a 2-dimensional space using a dimensionality reduction. Different dimensionality reductions are available. 
+								A color scale can be applied to explore whether it exists a correlation between the target elements and a selected feature or <em>sensitive</em>  element, and how strong this correlation is. 
+								The correlations are generated using names as a bridge, which are linked to the target and feature elements. It is possible to explore these links by clicking on the dots of the scatterplot.
+							</p>
+						</div>
+
+						<div>
+							<br/>
+							<button id='explanationsButton' onclick="showExplanations()"> Show introduction text </button>
+						</div>
+					</div>
 				</div>
 				<div style='text-align: center; width:50%; float: left;'>
 					<div id='divScatterPlot' style='text-align: center; width: 95%;'></div>
@@ -91,6 +113,7 @@
 			var selectedTarget, selectedFeature, selectedColorScaleFeature, selectedColorScale;
 
 			var delay = 200;
+			var explanationsShown = false;
 
 			function loadFilesInit(){
 				target_attributes.forEach(function(t1){
@@ -964,6 +987,20 @@
 				d3.select('#introductionDiv').attr('hidden', true);
 				d3.select('#visualizationDiv').attr('hidden', null);
 			};
+
+			function showExplanations(){
+				if (!explanationsShown){
+					d3.select('#explanationsNull').attr('hidden', true);
+					d3.select('#explanations').attr('hidden', null);
+					d3.select('#explanationsButton').text('Hide introduction text');
+					explanationsShown = true;
+				} else {
+					d3.select('#explanationsNull').attr('hidden', null);
+					d3.select('#explanations').attr('hidden', true);
+					d3.select('#explanationsButton').text('Show introduction text');
+					explanationsShown = false;
+				}
+			};
 			
 
 			loadFilesInit();
@@ -971,9 +1008,6 @@
 			setTimeout(function(){
 				setUpVisualization();
 			}, delay);
-
-
-	
 		</script>
 	</body>
 </html>
