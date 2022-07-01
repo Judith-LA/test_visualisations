@@ -4,31 +4,81 @@
 		<meta charset="utf-8">
 		<script type = "text/javascript" src="https://d3js.org/d3.v7.min.js"></script>
 		<script type="text/javascript" src="../legend.js"></script>
-		<link href='http://fonts.googleapis.com/css?family=Lato:400,700' rel='stylesheet' type='text/css'>
-		<link href="https://fonts.googleapis.com/css2?family=Assistant&display=swap" rel="stylesheet">
 		<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@200&family=Source+Sans+Pro:wght@300&display=swap" rel="stylesheet">
 		<link rel="stylesheet" href="style.css"></link>
-		<title>Indirect Bias Exploration - Visualisation 1</title>
+		<title>Indirect Bias Exploration - Visualization 1</title>
 	</head>
 
 	<body>
-		<h1> Indirect Bias Exploration - Visualisation 1</h1>
+		<div id='introductionDiv'>
+			<h1> Indirect Bias Exploration - Visualization 1</h1>
+			<h2> Introduction </h2>
 
-		<div style='width:100%;'>
-			<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
-			<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
-			<div id='divSorting' style='text-align: center; width:50%; float: right;'></div>
-		</div>
-		<div>
-			<div id='divTable' class='indirectTable' style='width: 95%; padding: 0 20;'>
-				<br>
-				<table id='tableFull' hidden></table>
-				<table id='tableSort' hidden></table>
+			
+				<p> 
+					The purpose of this visualization is to explore the potential biases learned by NLP transformer models, machine learning models which can be used to deal with human language.
+				</p>
+
+				<p> 
+					You will be able to choose a target category attribute (e.g. sport) and see the correlations made by the chosen model with different feature category attributes (e.g. beverage or trait). 
+					It is also possible to investigate the correlations between the target and feature attributes and some <em>sensitive</em> attributes (such as gender or religion), to check whether the target and feature elements could be linked by some indirect correlations with these sensitive features. The correlation scores for different models are available.
+				</p>
+
+				<p>	
+					The target and feature elements will be displayed in a table. In this table, the color of each cell indicates whether it exists a correlation between the elements displayed on the column and the row, and how strong is this correlation.
+					By clicking on the columns and rows headers, it is possible to sort the table in order to facilitate the exploration.
+					The correlations are generated using names as a bridge, which are linked to the column and row elements. It is possible to explore these links by clicking on the cells of the table.
+				</p>
+
+			<div>
+				<br/>
+				<button onclick="displayVisulization()"> Go to Visualization </button>
 			</div>
-			<div id='divLegend' style='text-align: center; float: right; margin-right: 5%;'></div>
 		</div>
-		<div style='width:100%;'>
-			<div id='divIndirectScatterPlot' style='text-align: center; width:50%; float: left;'></div>
+
+		<div id="visualizationDiv" hidden>
+			<h1> Indirect Bias Exploration - Visualization 1</h1>
+
+			<div style='width:100%;'>
+				<div id='divModel' style='text-align: center; height: 50%; width:100%;'></div>
+				<div id='divSelection' style='text-align: center; height: 50%; width:50%; float: left;'></div>
+				<div id='divSorting' style='text-align: center; width:50%; float: right;'></div>
+			</div>
+			<div>
+				<div id='divTable' class='indirectTable' style='width: 95%; padding: 0 20;'>
+					<br>
+					<table id='tableFull' hidden></table>
+					<table id='tableSort' hidden></table>
+				</div>
+			</div>
+			<div style='width:100%;'>
+				<div id='divIndirectScatterPlot' style='text-align: center; width:50%; float: left;'></div>
+
+				<div style="width:45%; float: right; margin-right: 5%;">
+					<div id='divLegend' style="float: right; margin-right: 5%;"></div>
+					<div id='explanationsNull' style="height: 130px; clear: both;"></div>
+					<div id='explanations' style="text-align: left; height: 130px; overflow: auto; clear: both;" hidden>
+						<p> 
+							The purpose of this visualization is to explore the potential biases learned by NLP transformer models, machine learning models which can be used to deal with human language. 
+						</p>
+
+						<p> 
+							You will be able to choose a target category attribute (e.g. sport) and see the correlations made by the chosen model with different feature category attributes (e.g. beverage or trait). 
+							It is also possible to investigate the correlations between the target and feature attributes and some <em>sensitive</em> attributes (such as gender or religion), to check whether the target and feature elements could be linked by some indirect correlations with these sensitive features. The correlation scores for different models are available. 
+						</p>
+
+						<p>	
+							The visualization is composed of a scatterplot, where each dot represents an element from the chosen target category. The position of the dots is defined by the feature category. High-dimensional vectors are derived from the correlation scores between the target and feature elements, which are mapped to a 2-dimensional space using a dimensionality reduction. Different dimensionality reductions are available. 
+							A color scale can be applied to explore whether it exists a correlation between the target elements and a selected feature or <em>sensitive</em>  element, and how strong this correlation is. 
+							The correlations are generated using names as a bridge, which are linked to the target and feature elements. It is possible to explore these links by clicking on the dots of the scatterplot.
+						</p>
+					</div>
+					<div>
+						<br/>
+						<button id='explanationsButton' onclick="showExplanations()"> Show introduction text </button>
+					</div>
+				</div>
+			</div>
 		</div>
 
 
@@ -76,6 +126,7 @@
 			var topN = 5;
 
 			var delay = 200;
+			var explanationsShown = false;
 
 
 			function array_product(a,b){
@@ -235,7 +286,7 @@
 			};
 
 
-			function setUpVisualisation(){
+			function setUpVisualization(){
 				d3.select('#divModel').text('Choose the model to use');
 				d3.select('#divModel').append('br');
 
@@ -624,10 +675,9 @@
 				var data_indirect = eval(column_name + '_' + row_name + '_indirect')[selectedModel];
 
 				var column_data = Array.from(d3.group(data, d => d[column_name]).keys());
-				//if ((column_name != 'age') & (column_name != 'yob') & (column_name != 'gender')){ column_data = column_data.sort(); };
 				column_data = column_data.sort();
 				var row_data = Array.from(d3.group(data, d => d[row_name]).keys());
-				if ((row_name != 'age') & (row_name != 'yob') & (row_name != 'gender')){ row_data = row_data.sort(); }
+				if ((row_name != 'age') & (row_name != 'gender')){ row_data = row_data.sort(); }
 
 				var table = d3.select('#tableFull');
 				table.attr('hidden', null);
@@ -1305,13 +1355,32 @@
 				return [x_min_lim, y_min_lim, x_max_lim, y_max_lim];
 			};
 
+
+			function displayVisulization(){
+				d3.select('#introductionDiv').attr('hidden', true);
+				d3.select('#visualizationDiv').attr('hidden', null);
+			};
+
+			function showExplanations(){
+				if (!explanationsShown){
+					d3.select('#explanationsNull').attr('hidden', true);
+					d3.select('#explanations').attr('hidden', null);
+					d3.select('#explanationsButton').text('Hide introduction text');
+					explanationsShown = true;
+				} else {
+					d3.select('#explanationsNull').attr('hidden', null);
+					d3.select('#explanations').attr('hidden', true);
+					d3.select('#explanationsButton').text('Show introduction text');
+					explanationsShown = false;
+				}
+			};
+
 			
 			loadFilesInit();
 			loadFiles();
 			setTimeout(function(){
-				setUpVisualisation();
+				setUpVisualization();
 			}, delay);
-
 		</script>
 	</body>
 </html>
