@@ -62,22 +62,22 @@ div.tooltip2 {
   height: 300px;
 }
 
-/*.slider-nav {
-  position: relative;
-  top:  110px;
-  width: 100%;
+button {
+	margin: 0 auto; 
+	display:block;
+	font-size: 16px;
+	background-color: #B0B0B0;
+  color: black;
+  border: 2px solid #B0B0B0;
+  border-radius: 10px;
   text-align: center;
+  text-decoration: none;
+  padding: 8px 40px;
+  transition-duration: 0.5s;
 }
-.slider-nav a {
-  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.3);
-  display: inline-block;
-  background-color: #adafbc;
-  width: 15px;
-  height: 15px;
-  margin: 0 3px;
+
+button:hover{
+  background-color: #E8E8E8;
+  color: black;
 }
-.slider-nav a:hover {
-  background-color: #fff;
-  box-shadow: 0px 0px 5px 0px rgba(255, 255, 255, 0.8);
-}*/
 
