@@ -115,7 +115,7 @@
 			colorScaleLegend[colorScaleMin] = 'strongly negative', colorScaleLegend[colorScaleMax] = 'strongly positive';
 
 			var clicks = {};
-			var similarityData = {};
+			//var similarityData = {};
 
 			var selectedModel;
 			var selectedColumn, selectedRow, sortingColumn, sortingRow;
@@ -155,48 +155,48 @@
 						if (t1 != t2){
 							this[t1 + '_' + t2 + '_corr'] = {};
 							this[t1 + '_' + t2 + '_indirect'] = {};
-							//this[t1 + '_' + t2 + '_sim'] = {};
+							this[t1 + '_' + t2 + '_sim'] = {};
 							var d_corr = eval(t1 + '_' + t2 + '_corr');
 							var d_indirect = eval(t1 + '_' + t2 + '_indirect');
-							//var d_sim = eval(t1 + '_' + t2 + '_sim');
+							var d_sim = eval(t1 + '_' + t2 + '_sim');
 							models.forEach(function(m){;
 								d_corr[m] = null;
 								d_indirect[m] = null;
-								//d_sim[m] = null;
+								d_sim[m] = {};
 							});
 						}
 					});
 
 					this[t1 + '_trait' + '_corr'] = {};
 					this[t1 + '_trait' + '_indirect'] = {};
-					//this[t1 + '_trait' + '_sim'] = {};
+					this[t1 + '_trait' + '_sim'] = {};
 					var d_corr = eval(t1 + '_trait' + '_corr');
 					var d_indirect = eval(t1 + '_trait'+ '_indirect');
-					//var d_sim = eval(t1 + '_trait' + '_sim');
+					var d_sim = eval(t1 + '_trait' + '_sim');
 					models.forEach(function(m){;
 						d_corr[m] = null;
 						d_indirect[m] = null;
-						//d_sim[m] = null;
+						d_sim[m] = {};
 					});
 
 					sensitive_attributes.forEach(function(s){
 						this[t1 + '_' + s + '_corr'] = {};
 						this[t1 + '_' + s + '_indirect'] = {};
-						//this[t1 + '_' + s + '_sim'] = {};
+						this[t1 + '_' + s + '_sim'] = {};
 						var d_corr = eval(t1 + '_' + s + '_corr');
 						var d_indirect = eval(t1 + '_' + s + '_indirect');
-						//var d_sim = eval(t1 + '_' + s + '_sim');
+						var d_sim = eval(t1 + '_' + s + '_sim');
 						models.forEach(function(m){
 							d_corr[m] = null;
 							d_indirect[m] = null;
-							//d_sim[m] = null;
+							d_sim[m] = {};
 						});
 					});
 				});
 
-				models.forEach(function(m){
+				/*models.forEach(function(m){
 					similarityData[m] = {};
-				});
+				});*/
 			};
 
 			function loadFiles(){
@@ -205,8 +205,46 @@
 						target_attributes.forEach(function(t2){
 							if (t1 != t2){
 								var d_corr = eval(t1 + '_' + t2 + '_corr');
+								var d_sim = eval(t1 + '_' + t2 + '_sim');
 								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_correlation.csv").then(function(data){
-									d_corr[m] = data;
+									//d_corr[m] = data;
+									d_corr[m] = data.filter(x => (x.country != 'Columbia') && 
+															 	 (x.occupation != 'developper') && 
+															 	 (x.occupation != 'receiptionist'));
+
+									var d_corr_target = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 				  (x.occupation != 'developper') && 
+															 	 				  (x.occupation != 'receiptionist')), 
+																 d => d[t1]);
+									var target_elements = Array.from(d_corr_target.keys());
+									target_elements.forEach(function(tElm1){
+										var tElm1_sim = {};
+										target_elements.forEach(function(tElm2){
+											if (tElm1 != tElm2){
+												var tElm1_corr = d_corr_target.get(tElm1).map(x => parseFloat(x.indirect_correlation));
+												var tElm2_corr = d_corr_target.get(tElm2).map(x => parseFloat(x.indirect_correlation));
+												tElm1_sim[tElm2] = cosine_similarity(tElm1_corr,tElm2_corr);
+											}
+										});
+										d_sim[m][tElm1] = tElm1_sim;
+									});
+
+									var d_corr_feature = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 				   (x.occupation != 'developper') && 
+															 	 				   (x.occupation != 'receiptionist')), 
+																  d => d[t2]);
+									var feature_elements = Array.from(d_corr_feature.keys());
+									feature_elements.forEach(function(fElm1){
+										var fElm1_sim = {};
+										feature_elements.forEach(function(fElm2){
+											if (fElm1 != fElm2){
+												var fElm1_corr = d_corr_feature.get(fElm1).map(x => parseFloat(x.indirect_correlation));
+												var fElm2_corr = d_corr_feature.get(fElm2).map(x => parseFloat(x.indirect_correlation));
+												fElm1_sim[fElm2] = cosine_similarity(fElm1_corr,fElm2_corr);
+											}
+										});
+										d_sim[m][fElm1] = fElm1_sim;
+									});
 								});
 								var d_indirect = eval(t1 + '_' + t2 + '_indirect');
 								d3.csv("../data/" + m + "/" + t1 + "_" + t2 + "_indirect.csv").then(function(data){
@@ -216,10 +254,17 @@
 						});
 
 						var d_corr = eval(t1 + '_trait' + '_corr');
+						var d_sim = eval(t1 + '_trait' + '_sim');
 						d3.csv("../data/" + m + "/" + t1 + "_trait" + "_correlation.csv").then(function(data){
-							d_corr[m] = data;
+							//d_corr[m] = data;
+							d_corr[m] = data.filter(x => (x.country != 'Columbia') && 
+														 (x.occupation != 'developper') && 
+														 (x.occupation != 'receiptionist'));
 
-							var d_corr_target = d3.group(data, d => d[t1]);
+							var d_corr_target = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 		  (x.occupation != 'developper') && 
+															 	 		  (x.occupation != 'receiptionist')), 
+														 d => d[t1]);
 							var target_elements = Array.from(d_corr_target.keys());
 							target_elements.forEach(function(tElm1){
 								var tElm1_sim = {};
@@ -230,10 +275,14 @@
 										tElm1_sim[tElm2] = cosine_similarity(tElm1_corr,tElm2_corr);
 									}
 								});
-								similarityData[m][tElm1] = tElm1_sim;
+								//similarityData[m][tElm1] = tElm1_sim;
+								d_sim[m][tElm1] = tElm1_sim;
 							});
 
-							var d_corr_feature = d3.group(data, d => d['trait']);
+							var d_corr_feature = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 		   (x.occupation != 'developper') && 
+															 	 		   (x.occupation != 'receiptionist')), 
+														  d => d['trait']);
 							var feature_elements = Array.from(d_corr_feature.keys());
 							feature_elements.forEach(function(fElm1){
 								var fElm1_sim = {};
@@ -244,7 +293,8 @@
 										fElm1_sim[fElm2] = cosine_similarity(fElm1_corr,fElm2_corr);
 									}
 								});
-								similarityData[m][fElm1] = fElm1_sim;
+								//similarityData[m][fElm1] = fElm1_sim;
+								d_sim[m][fElm1] = fElm1_sim;
 							});
 						});
 						var d_indirect = eval(t1 + '_trait'+ '_indirect');
@@ -254,11 +304,14 @@
 
 						sensitive_attributes.forEach(function(s){
 							var d_corr = eval(t1 + '_' + s + '_corr');
-							//var d_sim = eval(t1 + '_' + s + '_sim');
+							var d_sim = eval(t1 + '_' + s + '_sim');
 							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_correlation.csv").then(function(data){
-								d_corr[m] = data;
+								//d_corr[m] = data;
+								d_corr[m] = data.filter(x => (x.country != 'Columbia') && 
+															 (x.occupation != 'developper') && 
+															 (x.occupation != 'receiptionist'));
 
-								var d_corr_feature = d3.group(data, d => d[s]);
+								/*var d_corr_feature = d3.group(data, d => d[s]);
 								var feature_elements = Array.from(d_corr_feature.keys());
 								if (!Object.keys(similarityData[m]).includes(feature_elements[0])){
 									feature_elements.forEach(function(fElm1){
@@ -272,7 +325,41 @@
 										});
 										similarityData[m][fElm1] = fElm1_sim;
 									});
-								}
+								}*/
+
+								var d_corr_target = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 		  	  (x.occupation != 'developper') && 
+															 	 			  (x.occupation != 'receiptionist')), 
+															 d => d[t1]);
+								var target_elements = Array.from(d_corr_target.keys());
+								target_elements.forEach(function(tElm1){
+									var tElm1_sim = {};
+									target_elements.forEach(function(tElm2){
+										if (tElm1 != tElm2){
+											var tElm1_corr = d_corr_target.get(tElm1).map(x => parseFloat(x.indirect_correlation));
+											var tElm2_corr = d_corr_target.get(tElm2).map(x => parseFloat(x.indirect_correlation));
+											tElm1_sim[tElm2] = cosine_similarity(tElm1_corr,tElm2_corr);
+										}
+									});
+									d_sim[m][tElm1] = tElm1_sim;
+								});
+
+								var d_corr_feature = d3.group(data.filter(x => (x.country != 'Columbia') && 
+															 	 			   (x.occupation != 'developper') && 
+															 	 			   (x.occupation != 'receiptionist')), 
+															  d => d[s]);
+								var feature_elements = Array.from(d_corr_feature.keys());
+								feature_elements.forEach(function(fElm1){
+									var fElm1_sim = {};
+									feature_elements.forEach(function(fElm2){
+										if (fElm1 != fElm2){
+											var fElm1_corr = d_corr_feature.get(fElm1).map(x => parseFloat(x.indirect_correlation));
+											var fElm2_corr = d_corr_feature.get(fElm2).map(x => parseFloat(x.indirect_correlation));
+											fElm1_sim[fElm2] = cosine_similarity(fElm1_corr,fElm2_corr);
+										}
+									});
+									d_sim[m][fElm1] = fElm1_sim;
+								});
 							});
 							var d_indirect = eval(t1 + '_' + s + '_indirect');
 							d3.csv("../data/" + m + "/" + t1 + "_" + s + "_indirect.csv").then(function(data){
@@ -812,7 +899,8 @@
 
 				var data = eval(column_name + '_' + row_name + '_corr')[selectedModel];
 				var data_indirect = eval(column_name + '_' + row_name + '_indirect')[selectedModel];
-				var data_sim = similarityData[selectedModel];
+				var data_sim = eval(column_name + '_' + row_name + '_sim')[selectedModel];
+				//var data_sim = similarityData[selectedModel];
 
 				var column_data, row_data;
 				if (sortingOnColumn){
